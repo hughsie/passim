@@ -1,0 +1,7 @@
+[D-BUS Service]
+Name=org.freedesktop.Passim
+Documentation=https://github.com/hughsie/passim
+Exec=@sbindir@/passimd
+User=root
+SystemdService=passim.service
+AssumedAppArmorLabel=unconfined

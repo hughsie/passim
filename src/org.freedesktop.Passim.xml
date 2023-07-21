@@ -1,0 +1,80 @@
+<!DOCTYPE node PUBLIC
+"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+  <interface name='org.freedesktop.Passim'>
+    <doc:doc>
+      <doc:description>
+        <doc:para>
+          The interface used for interacting with Passim.
+          You must be the root user to interact with this interface.
+        </doc:para>
+      </doc:description>
+    </doc:doc>
+    <property name='DaemonVersion' type='s' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The daemon version.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
+    <method name='GetItems'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Gets the hashes of index.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg type='aa{sv}' name='items' direction='out'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>An array of vardict.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </method>
+    <method name='Publish'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Adds a file to the index.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <!-- FIXME: use a fd -->
+      <arg type='s' name='filename' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>The full filename of the file to publish.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
+      <arg type='u' name='max_age' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>The maximum age of the file in seconds.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
+      <arg type='u' name='share_limit' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>The maximum number of times this file can be shared.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </method>
+    <signal name='Changed'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Some value on the interface has changed.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </signal>
+  </interface>
+</node>
