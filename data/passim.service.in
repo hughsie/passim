@@ -1,0 +1,15 @@
+[Unit]
+Description=A local caching server
+Documentation=https://github.com/hughsie/passim
+After=dbus.service
+Before=display-manager.service
+
+[Service]
+Type=dbus
+TimeoutSec=180
+BusName=org.freedesktop.Passim
+ExecStart=@sbindir@/passimd
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+SystemCallFilter=~@mount

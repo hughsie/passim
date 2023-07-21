@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2023 Richard Hughes <richard@hughsie.com> -->
+<component type="console-application">
+  <id>org.freedesktop.Passim</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-2.0+</project_license>
+  <name>Passim</name>
+  <summary>Local caching server</summary>
+  <description>
+    <p>
+      Passim is a daemon that allows other software to share metadata on your local network.
+    </p>
+  </description>
+  <url type="bugtracker">https://github.com/hughsie/passim/issues</url>
+  <url type="homepage">https://github.com/hughsie/passim</url>
+<!--
+  <url type="translate">https://www.transifex.com/freedesktop/passim/</url>
+  <translation type="gettext">passim</translation>
+-->
+  <content_rating type="oars-1.0">
+    <content_attribute id="social-info">moderate</content_attribute>
+  </content_rating>
+  <provides>
+    <binary>passim</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0" date="2023-07-26">
+      <description>
+        <p>Initial release.</p>
+      </description>
+    </release>
+  </releases>
+</component>
