@@ -28,6 +28,13 @@ Requires: glib2%{?_isa} >= %{glib2_version}
 %description
 Passim is a daemon that allows other software to share metadata on your local network.
 
+%package devel
+Summary: Development package for %{name}
+Requires: %{name}%{?_isa} = %{version}-%{release}
+
+%description devel
+Files for development with %{name}.
+
 %prep
 %autosetup -p1
 
@@ -35,7 +42,7 @@ Passim is a daemon that allows other software to share metadata on your local ne
 
 %meson
 %meson_build
-# %meson_test
+%meson_test
 
 %install
 %meson_install
@@ -69,6 +76,14 @@ rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 %{_datadir}/metainfo/org.freedesktop.Passim.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/org.freedesktop.Passim.png
 %{_unitdir}/passim.service
+%{_libdir}/libpassim.so.1*
+%{_libdir}/girepository-1.0/Passim-1.0.typelib
+
+%files devel
+%{_datadir}/gir-1.0/Passim-1.0.gir
+%{_includedir}/passim-1/passim*.h
+%{_libdir}/libpassim*.so
+%{_libdir}/pkgconfig/passim.pc
 
 %changelog
 %autochangelog

@@ -13,14 +13,17 @@ executable(
     'passim-avahi-service.c',
     'passim-avahi-service-resolver.c',
     'passim-common.c',
-    'passim-item.c',
     'passim-server.c',
   ],
   include_directories: [
     root_incdir,
+    passim_incdir,
   ],
   dependencies: [
     libgio,
+  ],
+  link_with: [
+    passim,
   ],
   install: true,
   install_dir: sbindir,
@@ -30,14 +33,17 @@ executable(
   'passim',
   sources: [
     'passim-cli.c',
-    'passim-item.c',
     'passim-common.c',
   ],
   include_directories: [
     root_incdir,
+    passim_incdir,
   ],
   dependencies: [
     libgio,
+  ],
+  link_with: [
+    passim,
   ],
   install: true,
   install_dir: bindir,

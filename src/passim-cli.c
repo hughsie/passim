@@ -6,13 +6,12 @@
 
 #include "config.h"
 
-#include <gio/gio.h>
+#include <passim.h>
 
 #include "passim-common.h"
-#include "passim-item.h"
 
 typedef struct {
-	gdouble dummy;
+	PassimClient *client;
 } PassimCli;
 
 typedef gboolean (*PassimCliCmdFunc)(PassimCli *util, gchar **values, GError **error);
@@ -35,6 +34,8 @@ passim_cli_cmd_free(PassimCliCmd *item)
 static void
 passim_cli_private_free(PassimCli *self)
 {
+	if (self->client != NULL)
+		g_object_unref(self->client);
 	g_free(self);
 }
 
@@ -158,61 +159,18 @@ passim_cli_cmd_array_to_string(GPtrArray *array)
 	return g_string_free(string, FALSE);
 }
 
-static GPtrArray *
-passim_item_array_from_variant(GVariant *value)
-{
-	GPtrArray *items = g_ptr_array_new_with_free_func((GDestroyNotify)passim_item_free);
-	g_autoptr(GVariant) untuple = g_variant_get_child_value(value, 0);
-	gsize sz = g_variant_n_children(untuple);
-	for (guint i = 0; i < sz; i++) {
-		g_autoptr(GVariant) data = g_variant_get_child_value(untuple, i);
-		g_ptr_array_add(items, passim_item_from_variant(data));
-	}
-	return items;
-}
-
-static GDBusProxy *
-passim_cli_connect_proxy_new(PassimCli *self, GError **error)
-{
-	return g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
-					     G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
-						 G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES,
-					     NULL,
-					     PACKAGE_DBUS_SERVICE,
-					     PACKAGE_DBUS_PATH,
-					     PACKAGE_DBUS_INTERFACE,
-					     NULL,
-					     error);
-}
-
 static gboolean
 passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 {
-	g_autoptr(GDBusProxy) proxy;
 	g_autoptr(GPtrArray) items = NULL;
-	g_autoptr(GVariant) val = NULL;
 
-	proxy = passim_cli_connect_proxy_new(self, error);
-	if (proxy == NULL)
+	items = passim_client_get_items(self->client, error);
+	if (items == NULL)
 		return FALSE;
-	val = g_dbus_proxy_call_sync(proxy,
-				     "GetItems",
-				     NULL,
-				     G_DBUS_CALL_FLAGS_NONE,
-				     1500,
-				     NULL,
-				     error);
-	if (val == NULL)
-		return FALSE;
-	items = passim_item_array_from_variant(val);
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
-		g_print("%s %s (max-age: %u, share-count: %u, share-limit: %u)\n",
-			item->hash,
-			item->basename,
-			item->max_age,
-			item->share_count,
-			item->share_limit);
+		g_autofree gchar *str = passim_item_to_string(item);
+		g_print("%s\n", str);
 	}
 
 	/* success */
@@ -222,15 +180,8 @@ passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 static gboolean
 passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 {
-	guint32 max_age = 24 * 60 * 60;
-	guint32 share_limit = 5;
-	g_autofree gchar *basename = NULL;
-	g_autoptr(GDBusMessage) reply = NULL;
-	g_autoptr(GDBusMessage) request = NULL;
-	g_autoptr(GDBusProxy) proxy = NULL;
-	g_autoptr(GIOChannel) io = NULL;
-	g_autoptr(GUnixFDList) fd_list = g_unix_fd_list_new();
-	g_autoptr(GVariant) val = NULL;
+	g_autofree gchar *str = NULL;
+	g_autoptr(PassimItem) item = passim_item_new();
 
 	/* parse args */
 	if (g_strv_length(values) < 1) {
@@ -240,44 +191,18 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 				    "Invalid arguments");
 		return FALSE;
 	}
+	if (!passim_item_load_filename(item, values[0], error))
+		return FALSE;
 	if (g_strv_length(values) > 1)
-		max_age = g_ascii_strtoull(values[1], NULL, 10);
+		passim_item_set_max_age(item, g_ascii_strtoull(values[1], NULL, 10));
 	if (g_strv_length(values) > 2)
-		share_limit = g_ascii_strtoull(values[2], NULL, 10);
-	basename = g_path_get_basename(values[0]);
-
-	proxy = passim_cli_connect_proxy_new(self, error);
-	if (proxy == NULL)
-		return FALSE;
-	io = g_io_channel_new_file(values[0], "r", error);
-	if (io == NULL)
-		return FALSE;
-
-	/* set out of band file descriptor */
-	g_unix_fd_list_append(fd_list, g_io_channel_unix_get_fd(io), NULL);
-	request = g_dbus_message_new_method_call(g_dbus_proxy_get_name(proxy),
-						 g_dbus_proxy_get_object_path(proxy),
-						 g_dbus_proxy_get_interface_name(proxy),
-						 "Publish");
-	g_dbus_message_set_unix_fd_list(request, fd_list);
-
-	/* call into daemon */
-	g_dbus_message_set_body(
-	    request,
-	    g_variant_new("(hsuu)", g_io_channel_unix_get_fd(io), basename, max_age, share_limit));
-	reply = g_dbus_connection_send_message_with_reply_sync(g_dbus_proxy_get_connection(proxy),
-							       request,
-							       G_DBUS_SEND_MESSAGE_FLAGS_NONE,
-							       G_MAXINT,
-							       NULL,
-							       NULL, /* cancellable */
-							       error);
-	if (reply == NULL)
-		return FALSE;
-	if (g_dbus_message_to_gerror(reply, error))
+		passim_item_set_share_count(item, g_ascii_strtoull(values[2], NULL, 10));
+	if (!passim_client_publish(self->client, item, error))
 		return FALSE;
 
 	/* success */
+	str = passim_item_to_string(item);
+	g_print("Published: %s\n", str);
 	return TRUE;
 }
 
@@ -311,9 +236,17 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	/* connect to daemon */
+	self->client = passim_client_new();
+	if (!passim_client_load(self->client, &error)) {
+		g_printerr("Failed to connect to daemon: %s", error->message);
+		return EXIT_FAILURE;
+	}
+
 	/* just show versions and exit */
 	if (version) {
-		g_print("%s\n", VERSION);
+		g_print("client version: %s\n", VERSION);
+		g_print("daemon version: %s\n", passim_client_get_version(self->client));
 		return EXIT_SUCCESS;
 	}
 

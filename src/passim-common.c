@@ -63,16 +63,6 @@ passim_config_get_path(GKeyFile *kf)
 	return g_key_file_get_string(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, NULL);
 }
 
-gchar *
-passim_compute_checksum_for_filename(const gchar *filename, GError **error)
-{
-	gsize bufsz = 0;
-	g_autofree gchar *buf = NULL;
-	if (!g_file_get_contents(filename, &buf, &bufsz, error))
-		return FALSE;
-	return g_compute_checksum_for_data(G_CHECKSUM_SHA256, (const guchar *)buf, bufsz);
-}
-
 gboolean
 passim_xattr_set_value(const gchar *filename, const gchar *name, guint32 value, GError **error)
 {

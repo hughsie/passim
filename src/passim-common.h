@@ -8,10 +8,6 @@
 
 #include <gio/gio.h>
 
-#define PACKAGE_DBUS_SERVICE   "org.freedesktop.Passim"
-#define PACKAGE_DBUS_INTERFACE "org.freedesktop.Passim"
-#define PACKAGE_DBUS_PATH      "/"
-
 GKeyFile *
 passim_config_load(GError **error);
 guint16
@@ -20,8 +16,6 @@ gsize
 passim_config_get_max_item_size(GKeyFile *kf);
 gchar *
 passim_config_get_path(GKeyFile *kf);
-gchar *
-passim_compute_checksum_for_filename(const gchar *filename, GError **error);
 const gchar *
 passim_http_code_to_string(guint error_code);
 gboolean

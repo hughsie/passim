@@ -7,7 +7,7 @@ A local caching server. Named after the Latin word for “here, there and everyw
 Much of the software running on your computer that connects to other systems over the Internet needs
 to periodically download *metadata* or information needed to perform other requests.
 
-As part of running the fwupd/LVFS projects I've seen how *download this small file once per 24h*
+As part of running the passim/LVFS projects I've seen how *download this small file once per 24h*
 turns into tens of millions of requests per day. Everybody downloads the same file from a CDN, and
 although a CDN is not super-expensive, it's certainly not free. Everybody on your current network
 (perhaps thousands of users) has to download the same 1MB blob of metadata from a CDN over a
@@ -134,11 +134,10 @@ Using the CLI:
 
     $ passim dump
     7ea83bf1f9505f1e846cddef0d8ee49f6fd19361e2eb2f2e4f371b86382eacc2 HELLO.md (max-age: 86400, share-limit: 5)
-    $ passim publish /var/lib/fwupd/metadata/lvfs/metadata.xml.xz 60 44
+    $ passim publish /var/lib/passim/metadata/lvfs/metadata.xml.xz 60 44
     7ea83bf1f9505f1e846cddef0d8ee49f6fd19361e2eb2f2e4f371b86382eacc2 HELLO.md (max-age: 86400, share-limit: 5)
     0157efe3cdab369a17b68facb187df1c559c91e2771c9094880ff2019ad84eaf metadata.xml.xz (max-age: 60, share-count: 0, share-limit: 44)
 
 # TODO:
 
  - Self tests
- - Add a small shared library and header for fwupd

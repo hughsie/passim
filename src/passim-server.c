@@ -7,10 +7,10 @@
 #include "config.h"
 
 #include <gio/gunixinputstream.h>
+#include <passim.h>
 
 #include "passim-avahi.h"
 #include "passim-common.h"
-#include "passim-item.h"
 
 typedef struct {
 	GDBusConnection *connection;
@@ -62,8 +62,8 @@ passim_server_engine_changed(PassimServer *self)
 		return;
 	g_dbus_connection_emit_signal(self->connection,
 				      NULL,
-				      PACKAGE_DBUS_PATH,
-				      PACKAGE_DBUS_INTERFACE,
+				      PASSIM_DBUS_PATH,
+				      PASSIM_DBUS_INTERFACE,
 				      "Changed",
 				      NULL,
 				      NULL);
@@ -80,10 +80,9 @@ static gboolean
 passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **error)
 {
 	g_autofree gchar *basename = g_path_get_basename(filename);
-	g_autofree gchar *hash = NULL;
 	g_auto(GStrv) split = g_strsplit(basename, "-", 2);
 	g_autoptr(PassimItem) item = passim_item_new();
-	g_autoptr(GFileInfo) info = NULL;
+	guint32 value;
 
 	/* this doesn't have to be a sha256 hash, but it has to be *something* */
 	if (g_strv_length(split) != 2) {
@@ -94,33 +93,27 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 			    basename);
 		return FALSE;
 	}
-	hash = passim_compute_checksum_for_filename(filename, error);
-	if (hash == NULL)
-		return FALSE;
-	item->file = g_file_new_for_path(filename);
-	item->hash = g_strdup(hash);
-	item->basename = g_strdup(split[1]);
 
-	/* get ctime */
-	info = g_file_query_info(item->file,
-				 G_FILE_ATTRIBUTE_TIME_CREATED,
-				 G_FILE_QUERY_INFO_NONE,
-				 NULL,
-				 error);
-	if (info == NULL)
+	/* create new item */
+	passim_item_set_basename(item, split[1]);
+	if (!passim_item_load_filename(item, filename, error))
 		return FALSE;
-	item->ctime = g_file_info_get_creation_date_time(info);
 
 	/* get optional attributes */
-	item->max_age = passim_xattr_get_value(filename, "user.max_age", 24 * 60 * 60, error);
-	if (item->max_age == G_MAXUINT32)
+	value = passim_xattr_get_value(filename, "user.max_age", 24 * 60 * 60, error);
+	if (value == G_MAXUINT32)
 		return FALSE;
-	item->share_limit = passim_xattr_get_value(filename, "user.share_limit", 5, error);
-	if (item->share_limit == G_MAXUINT32)
+	passim_item_set_max_age(item, value);
+	value = passim_xattr_get_value(filename, "user.share_limit", 5, error);
+	if (value == G_MAXUINT32)
 		return FALSE;
+	passim_item_set_share_limit(item, value);
 
-	g_debug("added http://localhost:%u/%s?sha256=%s", self->port, split[1], hash);
-	g_hash_table_insert(self->items, g_steal_pointer(&hash), g_steal_pointer(&item));
+	g_debug("added http://localhost:%u/%s?sha256=%s",
+		self->port,
+		passim_item_get_basename(item),
+		passim_item_get_hash(item));
+	g_hash_table_insert(self->items, g_strdup(passim_item_get_hash(item)), g_object_ref(item));
 	return TRUE;
 }
 
@@ -255,12 +248,12 @@ passim_server_send_index(PassimServerContext *ctx)
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
 			g_autofree gchar *url = g_strdup_printf("http://localhost:%u/%s?sha256=%s",
 								self->port,
-								item->basename,
+								passim_item_get_basename(item),
 								hash);
 			g_string_append_printf(html,
 					       "<li><a href=\"%s\">%s</a></li>",
 					       url,
-					       item->basename);
+					       passim_item_get_basename(item));
 		}
 		g_string_append(html, "</ul>");
 	}
@@ -320,11 +313,11 @@ static void
 passim_server_delete_item(PassimServer *self, PassimItem *item)
 {
 	g_autoptr(GError) error = NULL;
-	if (!g_file_delete(item->file, NULL, &error)) {
-		g_warning("failed to delete %s: %s", item->hash, error->message);
+	if (!g_file_delete(passim_item_get_file(item), NULL, &error)) {
+		g_warning("failed to delete %s: %s", passim_item_get_hash(item), error->message);
 		return;
 	}
-	g_hash_table_remove(self->items, item->hash);
+	g_hash_table_remove(self->items, passim_item_get_hash(item));
 	if (!passim_server_avahi_register(self, &error)) {
 		g_warning("failed to register: %s", error->message);
 		return;
@@ -337,14 +330,15 @@ passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
 	PassimServer *self = ctx->self;
 	g_autoptr(GPtrArray) headers = g_ptr_array_new_with_free_func(g_free);
 
-	g_ptr_array_add(
-	    headers,
-	    g_strdup_printf("Content-Disposition: attachment; filename=\"%s\"", item->basename));
-	passim_server_context_send_file(ctx, item->file, headers);
+	g_ptr_array_add(headers,
+			g_strdup_printf("Content-Disposition: attachment; filename=\"%s\"",
+					passim_item_get_basename(item)));
+	passim_server_context_send_file(ctx, passim_item_get_file(item), headers);
+	passim_item_set_share_count(item, passim_item_get_share_count(item) + 1);
 
 	/* we've shared this enough now */
-	if (item->share_count++ > item->share_limit) {
-		g_debug("deleting %s as share limit reached", item->hash);
+	if (passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
+		g_debug("deleting %s as share limit reached", passim_item_get_hash(item));
 		passim_server_delete_item(self, item);
 	}
 }
@@ -507,6 +501,7 @@ passim_server_publish_file(PassimServer *self,
 	g_autofree gchar *localstate_dir = NULL;
 	g_autofree gchar *localstate_filename = NULL;
 	g_autofree gchar *hashed_filename = NULL;
+	g_autoptr(GFile) file = NULL;
 	g_autoptr(PassimItem) item = passim_item_new();
 
 	hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, blob);
@@ -539,11 +534,12 @@ passim_server_publish_file(PassimServer *self,
 		return FALSE;
 
 	/* add to interface */
-	item->file = g_file_new_for_path(localstate_filename);
-	item->hash = g_strdup(hash);
-	item->basename = g_strdup(basename);
-	item->max_age = max_age;
-	item->share_limit = share_limit;
+	file = g_file_new_for_path(localstate_filename);
+	passim_item_set_hash(item, hash);
+	passim_item_set_basename(item, basename);
+	passim_item_set_max_age(item, max_age);
+	passim_item_set_share_limit(item, share_limit);
+	passim_item_set_file(item, file);
 	g_debug("added %s", localstate_filename);
 	g_hash_table_insert(self->items, g_steal_pointer(&hash), g_steal_pointer(&item));
 
@@ -570,16 +566,19 @@ passim_server_poll_item_age_cb(gpointer user_data)
 	g_info("checking for max-age");
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
-		gint64 age = g_date_time_difference(dt_now, item->ctime) / G_TIME_SPAN_HOUR;
-		if (age > item->max_age) {
-			g_debug("deleting %s [%s] as max-age reached", item->hash, item->basename);
+		gint64 age =
+		    g_date_time_difference(dt_now, passim_item_get_ctime(item)) / G_TIME_SPAN_HOUR;
+		if (age > passim_item_get_max_age(item)) {
+			g_debug("deleting %s [%s] as max-age reached",
+				passim_item_get_hash(item),
+				passim_item_get_basename(item));
 			passim_server_delete_item(self, item);
 		} else {
 			g_debug("%s [%s] has age %uh, maximum is %uh",
-				item->hash,
-				item->basename,
+				passim_item_get_hash(item),
+				passim_item_get_basename(item),
 				(guint)age,
-				item->max_age);
+				passim_item_get_max_age(item));
 		}
 	}
 
@@ -718,7 +717,7 @@ passim_server_register_object(PassimServer *self)
 	    NULL};
 	registration_id =
 	    g_dbus_connection_register_object(self->connection,
-					      PACKAGE_DBUS_PATH,
+					      PASSIM_DBUS_PATH,
 					      self->introspection_daemon->interfaces[0],
 					      &interface_vtable,
 					      self,  /* user_data */
@@ -780,7 +779,7 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 	introspection_fn = g_build_filename(PACKAGE_DATADIR,
 					    "dbus-1",
 					    "interfaces",
-					    PACKAGE_DBUS_INTERFACE ".xml",
+					    PASSIM_DBUS_INTERFACE ".xml",
 					    NULL);
 	if (!g_file_get_contents(introspection_fn, &introspection_xml, NULL, error)) {
 		g_prefix_error(error, "failed to read introspection: ");
@@ -794,7 +793,7 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 
 	/* start D-Bus server */
 	self->owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
-					PACKAGE_DBUS_SERVICE,
+					PASSIM_DBUS_SERVICE,
 					G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT |
 					    G_BUS_NAME_OWNER_FLAGS_REPLACE,
 					passim_server_dbus_bus_acquired_cb,
@@ -849,10 +848,8 @@ main(int argc, char *argv[])
 	self->avahi = passim_avahi_new(self->kf);
 	self->port = passim_config_get_port(self->kf);
 	self->root = passim_config_get_path(self->kf);
-	self->items = g_hash_table_new_full(g_str_hash,
-					    g_str_equal,
-					    g_free,
-					    (GDestroyNotify)passim_item_free);
+	self->items =
+	    g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_object_unref);
 	if (!passim_server_start_dbus(self, &error)) {
 		g_warning("failed to register D-Bus: %s", error->message);
 		return 1;

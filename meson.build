@@ -5,6 +5,12 @@ project('passim', 'c',
   default_options: ['warning_level=2', 'c_std=c11'],
 )
 
+# libtool versioning - this applies to libpassim
+libpassim_lt_current = '1'
+libpassim_lt_revision = '0'
+libpassim_lt_age = '0'
+libpassim_lt_version = '@0@.@1@.@2@'.format(libpassim_lt_current, libpassim_lt_age, libpassim_lt_revision)
+
 warning_flags = [
   '-Waggregate-return',
   '-Wunused',
@@ -63,6 +69,7 @@ warning_flags = [
 ]
 cc = meson.get_compiler('c')
 add_project_arguments(cc.get_supported_arguments(warning_flags), language: 'c')
+add_project_arguments('-DPASSIM_COMPILATION', language: 'c')
 
 prefix = get_option('prefix')
 sysconfdir = join_paths(prefix, get_option('sysconfdir'))
@@ -77,6 +84,11 @@ conf.set_quoted('PACKAGE_DATADIR', datadir)
 conf.set_quoted('PACKAGE_SYSCONFDIR', sysconfdir)
 conf.set_quoted('PACKAGE_LOCALSTATEDIR', localstatedir)
 conf.set_quoted('VERSION', meson.project_version())
+
+varr = meson.project_version().split('.')
+conf.set('MAJOR_VERSION', varr[0])
+conf.set('MINOR_VERSION', varr[1])
+conf.set('MICRO_VERSION', varr[2])
 
 systemd = dependency('systemd', version: '>= 211')
 systemd_root_prefix = get_option('systemd_root_prefix')
@@ -109,5 +121,8 @@ configure_file(
   configuration: conf
 )
 
+python3 = import('python').find_installation('python3')
+
+subdir('libpassim')
 subdir('src')
 subdir('data')
