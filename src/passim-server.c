@@ -6,6 +6,8 @@
 
 #include "config.h"
 
+#include <gio/gunixinputstream.h>
+
 #include "passim-avahi.h"
 #include "passim-common.h"
 #include "passim-item.h"
@@ -495,24 +497,19 @@ passim_server_handler_cb(GSocketService *service,
 
 static gboolean
 passim_server_publish_file(PassimServer *self,
-			   const gchar *filename,
+			   GBytes *blob,
+			   const gchar *basename,
 			   guint32 max_age,
 			   guint32 share_limit,
 			   GError **error)
 {
-	gsize bufsz = 0;
-	g_autofree gchar *basename = g_path_get_basename(filename);
-	g_autofree gchar *buf = NULL;
 	g_autofree gchar *hash = NULL;
 	g_autofree gchar *localstate_dir = NULL;
 	g_autofree gchar *localstate_filename = NULL;
 	g_autofree gchar *hashed_filename = NULL;
 	g_autoptr(PassimItem) item = passim_item_new();
 
-	/* FIXME: use a FD instead */
-	if (!g_file_get_contents(filename, &buf, &bufsz, error))
-		return FALSE;
-	hash = g_compute_checksum_for_data(G_CHECKSUM_SHA256, (const guchar *)buf, bufsz);
+	hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, blob);
 	if (g_hash_table_contains(self->items, hash)) {
 		g_set_error(error, G_IO_ERROR, G_IO_ERROR_EXISTS, "%s already exists", hash);
 		return FALSE;
@@ -531,7 +528,10 @@ passim_server_publish_file(PassimServer *self,
 			    localstate_filename);
 		return FALSE;
 	}
-	if (!g_file_set_contents(localstate_filename, buf, bufsz, error))
+	if (!g_file_set_contents(localstate_filename,
+				 g_bytes_get_data(blob, NULL),
+				 g_bytes_get_size(blob),
+				 error))
 		return FALSE;
 	if (!passim_xattr_set_value(localstate_filename, "user.max_age", max_age, error))
 		return FALSE;
@@ -614,21 +614,66 @@ passim_server_method_call(GDBusConnection *connection,
 		return;
 	}
 	if (g_strcmp0(method_name, "Publish") == 0) {
+		GDBusMessage *message;
+		GUnixFDList *fd_list;
+		const gchar *basename = NULL;
+		gint fd = 0;
 		guint32 max_age = 0;
 		guint32 share_limit = 0;
-		const gchar *filename = NULL;
+		g_autoptr(GBytes) blob = NULL;
 		g_autoptr(GError) error = NULL;
+		g_autoptr(GInputStream) istream = NULL;
 
-		g_variant_get(parameters, "(&suu)", &filename, &max_age, &share_limit);
-		g_debug("Called %s(%s, %u,%u)", method_name, filename, max_age, share_limit);
-		if (0 && g_strstr_len(filename, -1, "/") != NULL) {
+		g_variant_get(parameters, "(h&suu)", &fd, &basename, &max_age, &share_limit);
+		g_debug("Called %s(%i, %s, %u,%u)",
+			method_name,
+			fd,
+			basename,
+			max_age,
+			share_limit);
+
+		/* sanity check this does not contain a path */
+		if (g_strstr_len(basename, -1, "/") != NULL) {
 			g_dbus_method_invocation_return_error_literal(invocation,
 								      G_DBUS_ERROR,
 								      G_DBUS_ERROR_INVALID_ARGS,
-								      "invalid filename");
+								      "invalid basename");
 			return;
 		}
-		if (!passim_server_publish_file(self, filename, max_age, share_limit, &error)) {
+
+		/* read from the file descriptor */
+		message = g_dbus_method_invocation_get_message(invocation);
+		fd_list = g_dbus_message_get_unix_fd_list(message);
+		if (fd_list == NULL || g_unix_fd_list_get_length(fd_list) != 1) {
+			g_dbus_method_invocation_return_error_literal(invocation,
+								      G_DBUS_ERROR,
+								      G_DBUS_ERROR_INVALID_ARGS,
+								      "invalid handle");
+			return;
+		}
+		fd = g_unix_fd_list_get(fd_list, 0, &error);
+		if (fd < 0) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+
+		/* read file */
+		istream = g_unix_input_stream_new(fd, TRUE);
+		blob = passim_load_input_stream(istream,
+						passim_config_get_max_item_size(self->kf),
+						&error);
+		if (blob == NULL) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+
+		/* publish the new file */
+		if (!passim_server_publish_file(self,
+						blob,
+						basename,
+						max_age,
+						share_limit,
+						&error)) {
 			g_dbus_method_invocation_return_gerror(invocation, error);
 			return;
 		}

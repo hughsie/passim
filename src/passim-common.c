@@ -10,9 +10,10 @@
 
 #include "passim-common.h"
 
-#define PASSIM_CONFIG_GROUP "daemon"
-#define PASSIM_CONFIG_PORT  "Port"
-#define PASSIM_CONFIG_PATH  "Path"
+#define PASSIM_CONFIG_GROUP	    "daemon"
+#define PASSIM_CONFIG_PORT	    "Port"
+#define PASSIM_CONFIG_PATH	    "Path"
+#define PASSIM_CONFIG_MAX_ITEM_SIZE "MaxItemSize"
 
 GKeyFile *
 passim_config_load(GError **error)
@@ -29,6 +30,12 @@ passim_config_load(GError **error)
 
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL))
 		g_key_file_set_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, 27500);
+	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL)) {
+		g_key_file_set_integer(kf,
+				       PASSIM_CONFIG_GROUP,
+				       PASSIM_CONFIG_MAX_ITEM_SIZE,
+				       100 * 1024 * 1024);
+	}
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, NULL)) {
 		g_autofree gchar *path =
 		    g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "data", NULL);
@@ -42,6 +49,12 @@ guint16
 passim_config_get_port(GKeyFile *kf)
 {
 	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL);
+}
+
+gsize
+passim_config_get_max_item_size(GKeyFile *kf)
+{
+	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL);
 }
 
 gchar *
@@ -149,4 +162,50 @@ passim_mkdir(const gchar *dirname, GError **error)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+GBytes *
+passim_load_input_stream(GInputStream *stream, gsize count, GError **error)
+{
+	guint8 tmp[0x8000] = {0x0};
+	g_autoptr(GByteArray) buf = g_byte_array_new();
+	g_autoptr(GError) error_local = NULL;
+
+	g_return_val_if_fail(G_IS_INPUT_STREAM(stream), NULL);
+	g_return_val_if_fail(error == NULL || *error == NULL, NULL);
+
+	/* this is invalid */
+	if (count == 0) {
+		g_set_error_literal(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_NOT_SUPPORTED,
+				    "A maximum read size must be specified");
+		return NULL;
+	}
+
+	/* read from stream in 32kB chunks */
+	while (TRUE) {
+		gssize sz;
+		sz = g_input_stream_read(stream, tmp, sizeof(tmp), NULL, &error_local);
+		if (sz == 0)
+			break;
+		if (sz < 0) {
+			g_set_error_literal(error,
+					    G_IO_ERROR,
+					    G_IO_ERROR_INVALID_DATA,
+					    error_local->message);
+			return NULL;
+		}
+		g_byte_array_append(buf, tmp, sz);
+		if (buf->len > count) {
+			g_set_error(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_DATA,
+				    "cannot read from fd: 0x%x > 0x%x",
+				    buf->len,
+				    (guint)count);
+			return NULL;
+		}
+	}
+	return g_bytes_new(buf->data, buf->len);
 }

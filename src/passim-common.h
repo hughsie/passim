@@ -16,6 +16,8 @@ GKeyFile *
 passim_config_load(GError **error);
 guint16
 passim_config_get_port(GKeyFile *kf);
+gsize
+passim_config_get_max_item_size(GKeyFile *kf);
 gchar *
 passim_config_get_path(GKeyFile *kf);
 gchar *
@@ -31,3 +33,5 @@ passim_xattr_get_value(const gchar *filename,
 		       GError **error);
 gboolean
 passim_mkdir(const gchar *dirname, GError **error);
+GBytes *
+passim_load_input_stream(GInputStream *stream, gsize count, GError **error);

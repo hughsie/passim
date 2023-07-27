@@ -140,5 +140,5 @@ Using the CLI:
 
 # TODO:
 
- - Use a file descriptor to add to the cache
  - Self tests
+ - Add a small shared library and header for fwupd

@@ -222,10 +222,15 @@ passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 static gboolean
 passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 {
-	g_autoptr(GDBusProxy) proxy;
-	g_autoptr(GVariant) val = NULL;
 	guint32 max_age = 24 * 60 * 60;
 	guint32 share_limit = 5;
+	g_autofree gchar *basename = NULL;
+	g_autoptr(GDBusMessage) reply = NULL;
+	g_autoptr(GDBusMessage) request = NULL;
+	g_autoptr(GDBusProxy) proxy = NULL;
+	g_autoptr(GIOChannel) io = NULL;
+	g_autoptr(GUnixFDList) fd_list = g_unix_fd_list_new();
+	g_autoptr(GVariant) val = NULL;
 
 	/* parse args */
 	if (g_strv_length(values) < 1) {
@@ -239,18 +244,37 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 		max_age = g_ascii_strtoull(values[1], NULL, 10);
 	if (g_strv_length(values) > 2)
 		share_limit = g_ascii_strtoull(values[2], NULL, 10);
+	basename = g_path_get_basename(values[0]);
 
 	proxy = passim_cli_connect_proxy_new(self, error);
 	if (proxy == NULL)
 		return FALSE;
-	val = g_dbus_proxy_call_sync(proxy,
-				     "Publish",
-				     g_variant_new("(suu)", values[0], max_age, share_limit),
-				     G_DBUS_CALL_FLAGS_NONE,
-				     1500,
-				     NULL,
-				     error);
-	if (val == NULL)
+	io = g_io_channel_new_file(values[0], "r", error);
+	if (io == NULL)
+		return FALSE;
+
+	/* set out of band file descriptor */
+	g_unix_fd_list_append(fd_list, g_io_channel_unix_get_fd(io), NULL);
+	request = g_dbus_message_new_method_call(g_dbus_proxy_get_name(proxy),
+						 g_dbus_proxy_get_object_path(proxy),
+						 g_dbus_proxy_get_interface_name(proxy),
+						 "Publish");
+	g_dbus_message_set_unix_fd_list(request, fd_list);
+
+	/* call into daemon */
+	g_dbus_message_set_body(
+	    request,
+	    g_variant_new("(hsuu)", g_io_channel_unix_get_fd(io), basename, max_age, share_limit));
+	reply = g_dbus_connection_send_message_with_reply_sync(g_dbus_proxy_get_connection(proxy),
+							       request,
+							       G_DBUS_SEND_MESSAGE_FLAGS_NONE,
+							       G_MAXINT,
+							       NULL,
+							       NULL, /* cancellable */
+							       error);
+	if (reply == NULL)
+		return FALSE;
+	if (g_dbus_message_to_gerror(reply, error))
 		return FALSE;
 
 	/* success */

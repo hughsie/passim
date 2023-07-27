@@ -44,11 +44,17 @@
           </doc:para>
         </doc:description>
       </doc:doc>
-      <!-- FIXME: use a fd -->
+      <arg type='h' name='handle' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>The file descriptor to read.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
       <arg type='s' name='filename' direction='in'>
         <doc:doc>
           <doc:summary>
-            <doc:para>The full filename of the file to publish.</doc:para>
+            <doc:para>The basename of the file to publish.</doc:para>
           </doc:summary>
         </doc:doc>
       </arg>
