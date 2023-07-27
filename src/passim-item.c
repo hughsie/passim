@@ -20,6 +20,8 @@ passim_item_free(PassimItem *item)
 {
 	if (item->file != NULL)
 		g_object_unref(item->file);
+	if (item->ctime != NULL)
+		g_date_time_unref(item->ctime);
 	g_free(item->hash);
 	g_free(item->basename);
 	g_free(item);

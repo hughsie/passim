@@ -15,6 +15,7 @@ typedef struct {
 	guint32 share_limit;
 	guint32 share_count;
 	GFile *file;
+	GDateTime *ctime;
 } PassimItem;
 
 PassimItem *

@@ -21,11 +21,14 @@ typedef struct {
 	gchar *root;
 	guint16 port;
 	guint owner_id;
+	guint poll_item_age_id;
 } PassimServer;
 
 static void
 passim_server_free(PassimServer *self)
 {
+	if (self->poll_item_age_id != 0)
+		g_source_remove(self->poll_item_age_id);
 	if (self->loop != NULL)
 		g_main_loop_unref(self->loop);
 	if (self->avahi != NULL)
@@ -75,6 +78,7 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 	g_autofree gchar *hash = NULL;
 	g_auto(GStrv) split = g_strsplit(basename, "-", 2);
 	g_autoptr(PassimItem) item = passim_item_new();
+	g_autoptr(GFileInfo) info = NULL;
 
 	/* this doesn't have to be a sha256 hash, but it has to be *something* */
 	if (g_strv_length(split) != 2) {
@@ -91,6 +95,16 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 	item->file = g_file_new_for_path(filename);
 	item->hash = g_strdup(hash);
 	item->basename = g_strdup(split[1]);
+
+	/* get ctime */
+	info = g_file_query_info(item->file,
+				 G_FILE_ATTRIBUTE_TIME_CREATED,
+				 G_FILE_QUERY_INFO_NONE,
+				 NULL,
+				 error);
+	if (info == NULL)
+		return FALSE;
+	item->ctime = g_file_info_get_creation_date_time(info);
 
 	/* get optional attributes */
 	item->max_age = passim_xattr_get_value(filename, "user.max_age", 24 * 60 * 60, error);
@@ -298,20 +312,9 @@ passim_server_context_send_file(PassimServerContext *ctx, GFile *file, GPtrArray
 }
 
 static void
-passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
+passim_server_delete_item(PassimServer *self, PassimItem *item)
 {
-	PassimServer *self = ctx->self;
 	g_autoptr(GError) error = NULL;
-	g_autoptr(GPtrArray) headers = g_ptr_array_new_with_free_func(g_free);
-
-	g_ptr_array_add(
-	    headers,
-	    g_strdup_printf("Content-Disposition: attachment; filename=\"%s\"", item->basename));
-	passim_server_context_send_file(ctx, item->file, headers);
-	if (++item->share_count < item->share_limit)
-		return;
-
-	g_debug("deleting %s as share limit reached", item->hash);
 	if (!g_file_delete(item->file, NULL, &error)) {
 		g_warning("failed to delete %s: %s", item->hash, error->message);
 		return;
@@ -320,6 +323,24 @@ passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
 	if (!passim_server_avahi_register(self, &error)) {
 		g_warning("failed to register: %s", error->message);
 		return;
+	}
+}
+
+static void
+passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
+{
+	PassimServer *self = ctx->self;
+	g_autoptr(GPtrArray) headers = g_ptr_array_new_with_free_func(g_free);
+
+	g_ptr_array_add(
+	    headers,
+	    g_strdup_printf("Content-Disposition: attachment; filename=\"%s\"", item->basename));
+	passim_server_context_send_file(ctx, item->file, headers);
+
+	/* we've shared this enough now */
+	if (item->share_count++ > item->share_limit) {
+		g_debug("deleting %s as share limit reached", item->hash);
+		passim_server_delete_item(self, item);
 	}
 }
 
@@ -527,6 +548,32 @@ passim_server_publish_file(PassimServer *self,
 	return passim_server_avahi_register(self, error);
 }
 
+static gboolean
+passim_server_poll_item_age_cb(gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
+	g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
+
+	g_info("checking for max-age");
+	for (guint i = 0; i < items->len; i++) {
+		PassimItem *item = g_ptr_array_index(items, i);
+		gint64 age = g_date_time_difference(dt_now, item->ctime) / G_TIME_SPAN_HOUR;
+		if (age > item->max_age) {
+			g_debug("deleting %s [%s] as max-age reached", item->hash, item->basename);
+			passim_server_delete_item(self, item);
+		} else {
+			g_debug("%s [%s] has age %uh, maximum is %uh",
+				item->hash,
+				item->basename,
+				(guint)age,
+				item->max_age);
+		}
+	}
+
+	return G_SOURCE_CONTINUE;
+}
+
 static void
 passim_server_method_call(GDBusConnection *connection,
 			  const gchar *sender,
@@ -719,6 +766,8 @@ main(int argc, char *argv[])
 		g_printerr("failed to load config: %s\n", error->message);
 		return 1;
 	}
+	self->poll_item_age_id =
+	    g_timeout_add_seconds(60 * 60, passim_server_poll_item_age_cb, self);
 	self->avahi = passim_avahi_new(self->kf);
 	self->port = passim_config_get_port(self->kf);
 	self->root = passim_config_get_path(self->kf);

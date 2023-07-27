@@ -141,6 +141,6 @@ Using the CLI:
 # TODO:
 
  - Use a file descriptor to add to the cache
- - Prune the cache every hour for max-age
  - Stop running as root
  - Self tests
+ - Fix memory leaks
