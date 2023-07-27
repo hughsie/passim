@@ -43,7 +43,7 @@ passim = library(
   install: true
 )
 
-libpassim_dep = declare_dependency(
+passim_dep = declare_dependency(
   link_with: passim,
   include_directories: [root_incdir, include_directories('.')],
   dependencies: libpassim_deps
