@@ -141,5 +141,4 @@ Using the CLI:
 # TODO:
 
  - Use a file descriptor to add to the cache
- - Stop running as root
  - Self tests
