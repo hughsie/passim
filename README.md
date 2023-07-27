@@ -30,7 +30,7 @@ The daemon then advertises the availability of the file as a mDNS service subtyp
 tiny single-threaded HTTP v1.0 server that supplies the file over HTTP. Note, I said HTTP there --
 not HTTPS -- i.e. so there's no SSL or encryption involved at all. Remember that.
 
-The file is sent when requested from a URL like `http://192.168.1.1:8080/filename.xml.gz?sha256=hash`
+The file is sent when requested from a URL like `http://192.168.1.1:27500/filename.xml.gz?sha256=hash`
 -- any file requested without the checksum will not be supplied. Although this is a chicken-and-egg
 problem where you don't know the payload checksum until you've checked the remote server, this is
 easy solved using a tiny <100 byte request to the CDN for the payload checksum (or a .jcat file)
@@ -47,7 +47,7 @@ metadata from other peers. If Avahi is not running, or mDNS is turned off on the
 no files will be shared.
 
 The cached index is shared with all users without any kind of authentication -- both over mDNS and
-as a HTTP page on `http://localhost:8080/`.
+as a HTTP page on `http://localhost:27500/`.
 
 So, **NEVER ADD FILES TO THE CACHE THAT YOU DO NOT WANT TO SHARE**. Even the filename may give more
 clues than you wanted to provide, e.g. sharing `madison.json` might get you in trouble with a family
@@ -67,6 +67,13 @@ Any client **MUST** (and I'll go as far as to say it again, **MUST**) calculate 
 supplied file and verify that it matches. There is no authentication or signing verification done
 so this step is non-optional. A malicious server could advertise the hash of `firmware.xml.gz` but
 actually supply `evil-payload.exe` -- and you do not want that.
+
+## Firewall Configuration
+
+Port 27500 should be open by default, but if downloading files fails you can open the port using
+firewalld:
+
+    $ firewall-cmd --permanent --zone=public --add-port=27500/tcp
 
 ## Comparisons
 
@@ -94,25 +101,25 @@ point of view Passim would be compliant (as it only shares locally) and IPFS wou
 
 ## Debugging
 
-    $ curl -v http://localhost:8080/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 -L
-    *   Trying 127.0.0.1:8080...
-    * Connected to localhost (127.0.0.1) port 8080 (#0)
+    $ curl -v http://localhost:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 -L
+    *   Trying 127.0.0.1:27500...
+    * Connected to localhost (127.0.0.1) port 27500 (#0)
     > GET /HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 HTTP/1.1
-    > Host: localhost:8080
+    > Host: localhost:27500
     > User-Agent: curl/8.0.1
     > Accept: */*
     >
     * HTTP 1.0, assume close after body
     < HTTP/1.0 303 See Other
     < Content-Length: 136
-    < Location: http://192.168.122.39:8080/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511
+    < Location: http://192.168.122.39:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511
     <
     * Closing connection 0
-    * Issue another request to this URL: 'http://192.168.122.39:8080/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511'
-    *   Trying 192.168.122.39:8080...
-    * Connected to 192.168.122.39 (192.168.122.39) port 8080 (#1)
+    * Issue another request to this URL: 'http://192.168.122.39:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511'
+    *   Trying 192.168.122.39:27500...
+    * Connected to 192.168.122.39 (192.168.122.39) port 27500 (#1)
     > GET /HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 HTTP/1.0
-    > Host: 192.168.122.39:8080
+    > Host: 192.168.122.39:27500
     > User-Agent: curl/8.0.1
     > Accept: */*
     >
@@ -137,4 +144,3 @@ Using the CLI:
  - Prune the cache every hour for max-age
  - Stop running as root
  - Self tests
- - Do not use 8080
