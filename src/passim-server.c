@@ -22,6 +22,7 @@ typedef struct {
 	guint16 port;
 	guint owner_id;
 	guint poll_item_age_id;
+	guint timed_exit_id;
 } PassimServer;
 
 static void
@@ -29,6 +30,8 @@ passim_server_free(PassimServer *self)
 {
 	if (self->poll_item_age_id != 0)
 		g_source_remove(self->poll_item_age_id);
+	if (self->timed_exit_id != 0)
+		g_source_remove(self->timed_exit_id);
 	if (self->loop != NULL)
 		g_main_loop_unref(self->loop);
 	if (self->avahi != NULL)
@@ -347,10 +350,10 @@ passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
 static void
 passim_server_avahi_find_cb(GObject *source_object, GAsyncResult *res, gpointer data)
 {
-	PassimServerContext *ctx = (PassimServerContext *)data;
 	guint index_random;
 	g_autoptr(GError) error = NULL;
 	g_autoptr(GPtrArray) addresses = NULL;
+	g_autoptr(PassimServerContext) ctx = (PassimServerContext *)data;
 
 	addresses = passim_avahi_find_finish(PASSIM_AVAHI(source_object), res, &error);
 	if (addresses == NULL) {
@@ -546,6 +549,15 @@ passim_server_publish_file(PassimServer *self,
 
 	/* success */
 	return passim_server_avahi_register(self, error);
+}
+
+static gboolean
+passim_server_timed_exit_cb(gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	self->timed_exit_id = 0;
+	g_main_loop_quit(self->loop);
+	return G_SOURCE_REMOVE;
 }
 
 static gboolean
@@ -753,12 +765,31 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 int
 main(int argc, char *argv[])
 {
+	gboolean version = FALSE;
+	gboolean timed_exit = FALSE;
 	g_autoptr(GError) error = NULL;
+	g_autoptr(GOptionContext) context = g_option_context_new(NULL);
 	g_autoptr(GSocketService) service = g_socket_service_new();
 	g_autoptr(PassimServer) self = g_new0(PassimServer, 1);
+	const GOptionEntry options[] = {
+	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
+	    {"timed-exit", '\0', 0, G_OPTION_ARG_NONE, &timed_exit, "Exit after a delay", NULL},
+	    {NULL}};
 
 	g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
 	g_setenv("G_DEBUG", "fatal-criticals", FALSE);
+
+	g_option_context_add_main_entries(context, options, NULL);
+	if (!g_option_context_parse(context, &argc, &argv, &error)) {
+		g_printerr("Failed to parse arguments: %s", error->message);
+		return EXIT_FAILURE;
+	}
+
+	/* just show versions and exit */
+	if (version) {
+		g_print("%s\n", VERSION);
+		return EXIT_SUCCESS;
+	}
 
 	self->loop = g_main_loop_new(NULL, FALSE);
 	self->kf = passim_config_load(&error);
@@ -768,6 +799,8 @@ main(int argc, char *argv[])
 	}
 	self->poll_item_age_id =
 	    g_timeout_add_seconds(60 * 60, passim_server_poll_item_age_cb, self);
+	if (timed_exit)
+		self->timed_exit_id = g_timeout_add_seconds(10, passim_server_timed_exit_cb, self);
 	self->avahi = passim_avahi_new(self->kf);
 	self->port = passim_config_get_port(self->kf);
 	self->root = passim_config_get_path(self->kf);

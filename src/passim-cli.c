@@ -289,7 +289,7 @@ main(int argc, char *argv[])
 
 	/* just show versions and exit */
 	if (version) {
-		g_print("%s", VERSION);
+		g_print("%s\n", VERSION);
 		return EXIT_SUCCESS;
 	}
 
