@@ -17,6 +17,7 @@
 typedef struct {
 	gchar *hash;
 	gchar *basename;
+	gchar *cmdline;
 	guint32 max_age;
 	guint32 share_limit;
 	guint32 share_count;
@@ -107,6 +108,47 @@ passim_item_set_basename(PassimItem *self, const gchar *basename)
 
 	g_free(priv->basename);
 	priv->basename = g_strdup(basename);
+}
+
+/**
+ * passim_item_get_cmdline:
+ * @self: a #PassimItem
+ *
+ * Gets the cmdline of the binary that published the item.
+ *
+ * Returns: the binary name, or %NULL if unset
+ *
+ * Since: 0.1.0
+ **/
+const gchar *
+passim_item_get_cmdline(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
+	return priv->cmdline;
+}
+
+/**
+ * passim_item_set_cmdline:
+ * @self: a #PassimItem
+ * @cmdline: (nullable): the binary name
+ *
+ * Sets the cmdline of the binary that published the item.
+ *
+ * Since: 0.1.0
+ **/
+void
+passim_item_set_cmdline(PassimItem *self, const gchar *cmdline)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+
+	/* not changed */
+	if (g_strcmp0(priv->cmdline, cmdline) == 0)
+		return;
+
+	g_free(priv->cmdline);
+	priv->cmdline = g_strdup(cmdline);
 }
 
 /**
@@ -371,6 +413,7 @@ passim_item_to_variant(PassimItem *self)
 
 	g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
 	g_variant_builder_add(&builder, "{sv}", "filename", g_variant_new_string(priv->basename));
+	g_variant_builder_add(&builder, "{sv}", "cmdline", g_variant_new_string(priv->cmdline));
 	g_variant_builder_add(&builder, "{sv}", "hash", g_variant_new_string(priv->hash));
 	g_variant_builder_add(&builder, "{sv}", "max-age", g_variant_new_uint32(priv->max_age));
 	g_variant_builder_add(&builder,
@@ -409,6 +452,8 @@ passim_item_from_variant(GVariant *variant)
 	while (g_variant_iter_next(iter, "{&sv}", &key, &value)) {
 		if (g_strcmp0(key, "filename") == 0)
 			priv->basename = g_variant_dup_string(value, NULL);
+		if (g_strcmp0(key, "cmdline") == 0)
+			priv->cmdline = g_variant_dup_string(value, NULL);
 		if (g_strcmp0(key, "hash") == 0)
 			priv->hash = g_variant_dup_string(value, NULL);
 		if (g_strcmp0(key, "max-age") == 0)
@@ -437,9 +482,10 @@ passim_item_to_string(PassimItem *self)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
-	return g_strdup_printf("%s %s (max-age: %u, share-count: %u, share-limit: %u)",
+	return g_strdup_printf("%s %s (cmdline: %s, max-age: %u, share-count: %u, share-limit: %u)",
 			       priv->hash,
 			       priv->basename,
+			       priv->cmdline,
 			       priv->max_age,
 			       priv->share_count,
 			       priv->share_limit);
@@ -465,6 +511,7 @@ passim_item_finalize(GObject *object)
 		g_date_time_unref(priv->ctime);
 	g_free(priv->hash);
 	g_free(priv->basename);
+	g_free(priv->cmdline);
 
 	G_OBJECT_CLASS(passim_item_parent_class)->finalize(object);
 }

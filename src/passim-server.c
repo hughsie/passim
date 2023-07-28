@@ -79,10 +79,11 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 static gboolean
 passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **error)
 {
+	guint32 value;
 	g_autofree gchar *basename = g_path_get_basename(filename);
+	g_autofree gchar *cmdline = NULL;
 	g_auto(GStrv) split = g_strsplit(basename, "-", 2);
 	g_autoptr(PassimItem) item = passim_item_new();
-	guint32 value;
 
 	/* this doesn't have to be a sha256 hash, but it has to be *something* */
 	if (g_strv_length(split) != 2) {
@@ -100,14 +101,18 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 		return FALSE;
 
 	/* get optional attributes */
-	value = passim_xattr_get_value(filename, "user.max_age", 24 * 60 * 60, error);
+	value = passim_xattr_get_uint32(filename, "user.max_age", 24 * 60 * 60, error);
 	if (value == G_MAXUINT32)
 		return FALSE;
 	passim_item_set_max_age(item, value);
-	value = passim_xattr_get_value(filename, "user.share_limit", 5, error);
+	value = passim_xattr_get_uint32(filename, "user.share_limit", 5, error);
 	if (value == G_MAXUINT32)
 		return FALSE;
 	passim_item_set_share_limit(item, value);
+	cmdline = passim_xattr_get_string(filename, "user.cmdline", error);
+	if (cmdline == NULL)
+		return FALSE;
+	passim_item_set_cmdline(item, cmdline);
 
 	g_debug("added http://localhost:%u/%s?sha256=%s",
 		self->port,
@@ -239,10 +244,17 @@ passim_server_send_index(PassimServerContext *ctx)
 	    "<p>A <a href=\"https://github.com/hughsie/%s\">local caching server</a>.</p>\n",
 	    PACKAGE_NAME);
 	if (keys == NULL) {
-		g_string_append(html, "<em>There are no shared files on this computer.</em>");
+		g_string_append(html, "<em>There are no shared files on this computer.</em>\n");
 	} else {
-		g_string_append(html, "<h2>Shared Files:</h2>");
-		g_string_append(html, "<ul>");
+		g_string_append(html, "<h2>Shared Files:</h2>\n");
+		g_string_append(html, "<table>\n");
+		g_string_append(html, "<tr>\n");
+		g_string_append(html, "<th>Filename</th>\n");
+		g_string_append(html, "<th>Hash</th>\n");
+		g_string_append(html, "<th>Binary</th>\n");
+		g_string_append(html, "<th>Max Age</th>\n");
+		g_string_append(html, "<th>Shared</th>\n");
+		g_string_append(html, "</tr>\n");
 		for (GList *l = keys; l != NULL; l = l->next) {
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
@@ -250,15 +262,30 @@ passim_server_send_index(PassimServerContext *ctx)
 								self->port,
 								passim_item_get_basename(item),
 								hash);
+			g_string_append(html, "<tr>\n");
 			g_string_append_printf(html,
-					       "<li><a href=\"%s\">%s</a></li>",
+					       "<td><a href=\"%s\">%s</a></td>\n",
 					       url,
 					       passim_item_get_basename(item));
+			g_string_append_printf(html,
+					       "<td><code>%s</code></td>\n",
+					       passim_item_get_hash(item));
+			g_string_append_printf(html,
+					       "<td><code>%s</code></td>\n",
+					       passim_item_get_cmdline(item));
+			g_string_append_printf(html,
+					       "<td>%uh</td>\n",
+					       passim_item_get_max_age(item));
+			g_string_append_printf(html,
+					       "<td>%u / %u</td>\n",
+					       passim_item_get_share_count(item),
+					       passim_item_get_share_limit(item));
+			g_string_append(html, "</tr>");
 		}
-		g_string_append(html, "</ul>");
+		g_string_append(html, "</table>\n");
 	}
-	g_string_append(html, "</body>");
-	g_string_append(html, "</html>");
+	g_string_append(html, "</body>\n");
+	g_string_append(html, "</html>\n");
 	passim_server_context_send(ctx, 200, NULL, html->str);
 }
 
@@ -490,26 +517,20 @@ passim_server_handler_cb(GSocketService *service,
 }
 
 static gboolean
-passim_server_publish_file(PassimServer *self,
-			   GBytes *blob,
-			   const gchar *basename,
-			   guint32 max_age,
-			   guint32 share_limit,
-			   GError **error)
+passim_server_publish_file(PassimServer *self, GBytes *blob, PassimItem *item, GError **error)
 {
 	g_autofree gchar *hash = NULL;
 	g_autofree gchar *localstate_dir = NULL;
 	g_autofree gchar *localstate_filename = NULL;
 	g_autofree gchar *hashed_filename = NULL;
 	g_autoptr(GFile) file = NULL;
-	g_autoptr(PassimItem) item = passim_item_new();
 
 	hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, blob);
 	if (g_hash_table_contains(self->items, hash)) {
 		g_set_error(error, G_IO_ERROR, G_IO_ERROR_EXISTS, "%s already exists", hash);
 		return FALSE;
 	}
-	hashed_filename = g_strdup_printf("%s-%s", hash, basename);
+	hashed_filename = g_strdup_printf("%s-%s", hash, passim_item_get_basename(item));
 
 	localstate_dir = g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "data", NULL);
 	if (!passim_mkdir(localstate_dir, error))
@@ -528,20 +549,28 @@ passim_server_publish_file(PassimServer *self,
 				 g_bytes_get_size(blob),
 				 error))
 		return FALSE;
-	if (!passim_xattr_set_value(localstate_filename, "user.max_age", max_age, error))
+	if (!passim_xattr_set_uint32(localstate_filename,
+				     "user.max_age",
+				     passim_item_get_max_age(item),
+				     error))
 		return FALSE;
-	if (!passim_xattr_set_value(localstate_filename, "user.share_limit", share_limit, error))
+	if (!passim_xattr_set_uint32(localstate_filename,
+				     "user.share_limit",
+				     passim_item_get_share_limit(item),
+				     error))
+		return FALSE;
+	if (!passim_xattr_set_string(localstate_filename,
+				     "user.cmdline",
+				     passim_item_get_cmdline(item),
+				     error))
 		return FALSE;
 
 	/* add to interface */
 	file = g_file_new_for_path(localstate_filename);
 	passim_item_set_hash(item, hash);
-	passim_item_set_basename(item, basename);
-	passim_item_set_max_age(item, max_age);
-	passim_item_set_share_limit(item, share_limit);
 	passim_item_set_file(item, file);
 	g_debug("added %s", localstate_filename);
-	g_hash_table_insert(self->items, g_steal_pointer(&hash), g_steal_pointer(&item));
+	g_hash_table_insert(self->items, g_steal_pointer(&hash), g_object_ref(item));
 
 	/* success */
 	return passim_server_avahi_register(self, error);
@@ -585,6 +614,63 @@ passim_server_poll_item_age_cb(gpointer user_data)
 	return G_SOURCE_CONTINUE;
 }
 
+static gchar *
+passim_server_sender_get_cmdline(PassimServer *self, const gchar *sender, GError **error)
+{
+	guint value = G_MAXUINT;
+	g_autofree gchar *cmdline_buf = NULL;
+	g_autofree gchar *cmdline_fn = NULL;
+	g_autoptr(GVariant) val = NULL;
+
+	val = g_dbus_proxy_call_sync(self->proxy_uid,
+				     "GetConnectionUnixProcessID",
+				     g_variant_new("(s)", sender),
+				     G_DBUS_CALL_FLAGS_NONE,
+				     2000,
+				     NULL,
+				     error);
+	if (val == NULL) {
+		g_prefix_error(error, "failed to read user id of caller: ");
+		return NULL;
+	}
+	g_variant_get(val, "(u)", &value);
+	cmdline_fn = g_strdup_printf("/proc/%u/cmdline", value);
+	if (!g_file_get_contents(cmdline_fn, &cmdline_buf, NULL, error)) {
+		g_prefix_error(error, "failed to caller cmdline: ");
+		return NULL;
+	}
+	return g_path_get_basename(cmdline_buf);
+}
+
+static gboolean
+passim_server_sender_check_uid(PassimServer *self, const gchar *sender, GError **error)
+{
+	guint value = G_MAXUINT;
+	g_autoptr(GVariant) val = NULL;
+
+	val = g_dbus_proxy_call_sync(self->proxy_uid,
+				     "GetConnectionUnixUser",
+				     g_variant_new("(s)", sender),
+				     G_DBUS_CALL_FLAGS_NONE,
+				     2000,
+				     NULL,
+				     error);
+	if (val == NULL) {
+		g_prefix_error(error, "failed to read user id of caller: ");
+		return FALSE;
+	}
+	g_variant_get(val, "(u)", &value);
+	if (value != 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_PERMISSION_DENIED,
+			    "permission denied: UID %u != 0",
+			    value);
+		return FALSE;
+	}
+	return TRUE;
+}
+
 static void
 passim_server_method_call(GDBusConnection *connection,
 			  const gchar *sender,
@@ -619,9 +705,11 @@ passim_server_method_call(GDBusConnection *connection,
 		gint fd = 0;
 		guint32 max_age = 0;
 		guint32 share_limit = 0;
+		g_autofree gchar *cmdline = NULL;
 		g_autoptr(GBytes) blob = NULL;
 		g_autoptr(GError) error = NULL;
 		g_autoptr(GInputStream) istream = NULL;
+		g_autoptr(PassimItem) item = passim_item_new();
 
 		g_variant_get(parameters, "(h&suu)", &fd, &basename, &max_age, &share_limit);
 		g_debug("Called %s(%i, %s, %u,%u)",
@@ -630,6 +718,23 @@ passim_server_method_call(GDBusConnection *connection,
 			basename,
 			max_age,
 			share_limit);
+		passim_item_set_basename(item, basename);
+		passim_item_set_max_age(item, max_age);
+		passim_item_set_share_limit(item, share_limit);
+
+		/* only callable by root */
+		if (!passim_server_sender_check_uid(self, sender, &error)) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+
+		/* record the binary that is publishing the file */
+		cmdline = passim_server_sender_get_cmdline(self, sender, &error);
+		if (cmdline == NULL) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+		passim_item_set_cmdline(item, cmdline);
 
 		/* sanity check this does not contain a path */
 		if (g_strstr_len(basename, -1, "/") != NULL) {
@@ -667,12 +772,7 @@ passim_server_method_call(GDBusConnection *connection,
 		}
 
 		/* publish the new file */
-		if (!passim_server_publish_file(self,
-						blob,
-						basename,
-						max_age,
-						share_limit,
-						&error)) {
+		if (!passim_server_publish_file(self, blob, item, &error)) {
 			g_dbus_method_invocation_return_gerror(invocation, error);
 			return;
 		}

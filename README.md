@@ -134,7 +134,7 @@ Using the CLI:
 
     $ passim dump
     7ea83bf1f9505f1e846cddef0d8ee49f6fd19361e2eb2f2e4f371b86382eacc2 HELLO.md (max-age: 86400, share-limit: 5)
-    $ passim publish /var/lib/passim/metadata/lvfs/metadata.xml.xz 60 44
+    $ sudo passim publish /var/lib/passim/metadata/lvfs/metadata.xml.xz 60 44
     7ea83bf1f9505f1e846cddef0d8ee49f6fd19361e2eb2f2e4f371b86382eacc2 HELLO.md (max-age: 86400, share-limit: 5)
     0157efe3cdab369a17b68facb187df1c559c91e2771c9094880ff2019ad84eaf metadata.xml.xz (max-age: 60, share-count: 0, share-limit: 44)
 

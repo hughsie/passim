@@ -64,14 +64,75 @@ passim_config_get_path(GKeyFile *kf)
 }
 
 gboolean
-passim_xattr_set_value(const gchar *filename, const gchar *name, guint32 value, GError **error)
+passim_xattr_set_string(const gchar *filename,
+			const gchar *name,
+			const gchar *value,
+			GError **error)
+{
+	ssize_t rc = setxattr(filename, name, value, strlen(value), XATTR_CREATE);
+	if (rc < 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    g_io_error_from_errno(errno),
+			    "failed to set %s: %s",
+			    name,
+			    strerror(errno));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+gchar *
+passim_xattr_get_string(const gchar *filename, const gchar *name, GError **error)
+{
+	ssize_t rc;
+	g_autofree gchar *buf = NULL;
+
+	rc = getxattr(filename, name, NULL, 0);
+	if (rc < 0) {
+		if (errno == ENODATA)
+			return g_strdup("");
+		g_set_error(error,
+			    G_IO_ERROR,
+			    g_io_error_from_errno(errno),
+			    "failed to get %s: %s",
+			    name,
+			    strerror(errno));
+		return NULL;
+	}
+	if (rc == 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_DATA,
+			    "invalid data for %s",
+			    name);
+		return NULL;
+	}
+
+	/* copy out with appended NUL */
+	buf = g_new0(gchar, rc + 1);
+	rc = getxattr(filename, name, buf, rc + 1);
+	if (rc < 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    g_io_error_from_errno(errno),
+			    "failed to get %s: %s",
+			    name,
+			    strerror(errno));
+		return NULL;
+	}
+	return g_steal_pointer(&buf);
+}
+
+gboolean
+passim_xattr_set_uint32(const gchar *filename, const gchar *name, guint32 value, GError **error)
 {
 	ssize_t rc = setxattr(filename, name, &value, sizeof(value), XATTR_CREATE);
 	if (rc < 0) {
 		g_set_error(error,
 			    G_IO_ERROR,
 			    g_io_error_from_errno(errno),
-			    "failed to get %s: %s",
+			    "failed to set %s: %s",
 			    name,
 			    strerror(errno));
 		return FALSE;
@@ -80,10 +141,10 @@ passim_xattr_set_value(const gchar *filename, const gchar *name, guint32 value, 
 }
 
 guint64
-passim_xattr_get_value(const gchar *filename,
-		       const gchar *name,
-		       guint32 value_fallback,
-		       GError **error)
+passim_xattr_get_uint32(const gchar *filename,
+			const gchar *name,
+			guint32 value_fallback,
+			GError **error)
 {
 	guint32 value = 0;
 	ssize_t rc = getxattr(filename, name, &value, sizeof(value));

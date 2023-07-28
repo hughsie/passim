@@ -10,6 +10,7 @@ LIBPASSIM_0.1.0 {
     passim_client_publish;
     passim_item_from_variant;
     passim_item_get_basename;
+    passim_item_get_cmdline;
     passim_item_get_ctime;
     passim_item_get_file;
     passim_item_get_hash;
@@ -20,6 +21,7 @@ LIBPASSIM_0.1.0 {
     passim_item_load_filename;
     passim_item_new;
     passim_item_set_basename;
+    passim_item_set_cmdline;
     passim_item_set_ctime;
     passim_item_set_file;
     passim_item_set_hash;
