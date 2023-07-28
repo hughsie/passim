@@ -46,7 +46,7 @@ We'll assume that any network with working mDNS (as implemented in Avahi) is goo
 metadata from other peers. If Avahi is not running, or mDNS is turned off on the firewall then
 no files will be shared.
 
-The cached index is shared with all users without any kind of authentication -- both over mDNS and
+The cached index is available locally without any kind of authentication -- both over mDNS and
 as a HTTP page on `http://localhost:27500/`.
 
 So, **NEVER ADD FILES TO THE CACHE THAT YOU DO NOT WANT TO SHARE**. Even the filename may give more
@@ -55,7 +55,7 @@ member. This can be more subtle; if you download a security update for a Lenovo 
 and share it with other laptops on your LAN -- it also tells the attacker your laptop model and also
 that you're running a system firmware that isn't patched against the latest firmware bug.
 
-My reccomendation here is only to advertise files that are common to all machines. For instance:
+My recommendation here is only to advertise files that are common to all machines. For instance:
 
  * AdBlocker metadata
  * Firmware update metadata

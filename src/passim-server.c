@@ -220,11 +220,12 @@ static void
 passim_server_context_send_error(PassimServerContext *ctx, guint error_code, const gchar *reason)
 {
 	g_autofree gchar *html = NULL;
+	const gchar *reason_fallback = reason ? reason : passim_http_code_to_string(error_code);
 	html = g_strdup_printf("<html><head><title>%u %s</title></head>"
 			       "<body>%s</body></html>",
 			       error_code,
 			       passim_http_code_to_string(error_code),
-			       reason);
+			       reason_fallback);
 	passim_server_context_send(ctx, error_code, NULL, html);
 }
 
@@ -420,6 +421,13 @@ passim_server_avahi_find_cb(GObject *source_object, GAsyncResult *res, gpointer 
 }
 
 static gboolean
+passim_server_is_loopback(const gchar *inet_addr)
+{
+	g_autoptr(GInetAddress) address = g_inet_address_new_from_string(inet_addr);
+	return g_inet_address_get_is_loopback(address);
+}
+
+static gboolean
 passim_server_handler_cb(GSocketService *service,
 			 GSocketConnection *connection,
 			 GObject *source_object,
@@ -488,6 +496,10 @@ passim_server_handler_cb(GSocketService *service,
 
 	/* just return the index */
 	if (g_strcmp0(unescaped, "/") == 0) {
+		if (!passim_server_is_loopback(inet_addrstr)) {
+			passim_server_context_send_error(ctx, 403, NULL);
+			return TRUE;
+		}
 		passim_server_send_index(ctx);
 		return TRUE;
 	}
@@ -495,6 +507,10 @@ passim_server_handler_cb(GSocketService *service,
 		g_autofree gchar *fn =
 		    g_build_filename(PACKAGE_DATADIR, PACKAGE_NAME, unescaped, NULL);
 		g_autoptr(GFile) file = g_file_new_for_path(fn);
+		if (!passim_server_is_loopback(inet_addrstr)) {
+			passim_server_context_send_error(ctx, 403, NULL);
+			return TRUE;
+		}
 		passim_server_context_send_file(ctx, file, NULL);
 		return TRUE;
 	}

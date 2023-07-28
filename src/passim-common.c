@@ -184,6 +184,8 @@ passim_http_code_to_string(guint error_code)
 		return "See Other";
 	if (error_code == 400)
 		return "Bad Request";
+	if (error_code == 403)
+		return "Forbidden";
 	if (error_code == 404)
 		return "Not Found";
 	if (error_code == 501)
