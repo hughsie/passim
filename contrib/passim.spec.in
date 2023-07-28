@@ -18,6 +18,7 @@ BuildRequires: systemd >= %{systemd_version}
 BuildRequires: meson
 BuildRequires: gcc
 BuildRequires: git-core
+BuildRequires: gobject-introspection-devel
 
 Requires(post): systemd
 Requires(preun): systemd
