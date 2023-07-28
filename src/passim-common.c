@@ -260,3 +260,18 @@ passim_load_input_stream(GInputStream *stream, gsize count, GError **error)
 	}
 	return g_bytes_new(buf->data, buf->len);
 }
+
+gchar *
+passim_get_boot_time(void)
+{
+	g_autofree gchar *buf = NULL;
+	g_auto(GStrv) lines = NULL;
+	if (!g_file_get_contents("/proc/stat", &buf, NULL, NULL))
+		return NULL;
+	lines = g_strsplit(buf, "\n", -1);
+	for (guint i = 0; lines[i] != NULL; i++) {
+		if (g_str_has_prefix(lines[i], "btime "))
+			return g_strdup(lines[i] + 6);
+	}
+	return NULL;
+}

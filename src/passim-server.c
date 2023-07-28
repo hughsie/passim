@@ -72,8 +72,16 @@ passim_server_engine_changed(PassimServer *self)
 static gboolean
 passim_server_avahi_register(PassimServer *self, GError **error)
 {
-	g_autofree gchar **keys = (gchar **)g_hash_table_get_keys_as_array(self->items, NULL);
-	return passim_avahi_register(self->avahi, keys, error);
+	guint keyidx = 0;
+	g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
+	g_autofree const gchar **keys = g_new0(const gchar *, items->len + 1);
+	for (guint i = 0; i < items->len; i++) {
+		PassimItem *item = g_ptr_array_index(items, i);
+		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED))
+			continue;
+		keys[keyidx++] = passim_item_get_hash(item);
+	}
+	return passim_avahi_register(self->avahi, (gchar **)keys, error);
 }
 
 static gboolean
@@ -81,6 +89,7 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 {
 	guint32 value;
 	g_autofree gchar *basename = g_path_get_basename(filename);
+	g_autofree gchar *boot_time = NULL;
 	g_autofree gchar *cmdline = NULL;
 	g_auto(GStrv) split = g_strsplit(basename, "-", 2);
 	g_autoptr(PassimItem) item = passim_item_new();
@@ -113,6 +122,16 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 	if (cmdline == NULL)
 		return FALSE;
 	passim_item_set_cmdline(item, cmdline);
+
+	/* only allowed when rebooted */
+	cmdline = passim_xattr_get_string(filename, "user.boot_time", NULL);
+	if (cmdline != NULL) {
+		g_autofree gchar *boot_time_now = passim_get_boot_time();
+		if (g_strcmp0(boot_time_now, boot_time) == 0) {
+			passim_item_add_flag(item, PASSIM_ITEM_FLAG_NEXT_REBOOT);
+			passim_item_add_flag(item, PASSIM_ITEM_FLAG_DISABLED);
+		}
+	}
 
 	g_debug("added http://localhost:%u/%s?sha256=%s",
 		self->port,
@@ -254,10 +273,12 @@ passim_server_send_index(PassimServerContext *ctx)
 		g_string_append(html, "<th>Binary</th>\n");
 		g_string_append(html, "<th>Max Age</th>\n");
 		g_string_append(html, "<th>Shared</th>\n");
+		g_string_append(html, "<th>Flags</th>\n");
 		g_string_append(html, "</tr>\n");
 		for (GList *l = keys; l != NULL; l = l->next) {
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
+			g_autofree gchar *flags = passim_item_get_flags_as_string(item);
 			g_autofree gchar *url = g_strdup_printf("http://localhost:%u/%s?sha256=%s",
 								self->port,
 								passim_item_get_basename(item),
@@ -280,6 +301,7 @@ passim_server_send_index(PassimServerContext *ctx)
 					       "<td>%u / %u</td>\n",
 					       passim_item_get_share_count(item),
 					       passim_item_get_share_limit(item));
+			g_string_append_printf(html, "<td><code>%s</code></td>\n", flags);
 			g_string_append(html, "</tr>");
 		}
 		g_string_append(html, "</table>\n");
@@ -565,6 +587,17 @@ passim_server_publish_file(PassimServer *self, GBytes *blob, PassimItem *item, G
 				     error))
 		return FALSE;
 
+	/* only allowed when rebooted */
+	if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_NEXT_REBOOT)) {
+		g_autofree gchar *boot_time = passim_get_boot_time();
+		if (!passim_xattr_set_string(localstate_filename,
+					     "user.boot_time",
+					     boot_time,
+					     error))
+			return FALSE;
+		passim_item_add_flag(item, PASSIM_ITEM_FLAG_DISABLED);
+	}
+
 	/* add to interface */
 	file = g_file_new_for_path(localstate_filename);
 	passim_item_set_hash(item, hash);
@@ -705,20 +738,29 @@ passim_server_method_call(GDBusConnection *connection,
 		gint fd = 0;
 		guint32 max_age = 0;
 		guint32 share_limit = 0;
+		guint64 flags = 0;
 		g_autofree gchar *cmdline = NULL;
 		g_autoptr(GBytes) blob = NULL;
 		g_autoptr(GError) error = NULL;
 		g_autoptr(GInputStream) istream = NULL;
 		g_autoptr(PassimItem) item = passim_item_new();
 
-		g_variant_get(parameters, "(h&suu)", &fd, &basename, &max_age, &share_limit);
-		g_debug("Called %s(%i, %s, %u,%u)",
+		g_variant_get(parameters,
+			      "(h&stuu)",
+			      &fd,
+			      &basename,
+			      &flags,
+			      &max_age,
+			      &share_limit);
+		g_debug("Called %s(%i, %s, 0x%x, %u, %u)",
 			method_name,
 			fd,
 			basename,
+			(guint)flags,
 			max_age,
 			share_limit);
 		passim_item_set_basename(item, basename);
+		passim_item_set_flags(item, flags);
 		passim_item_set_max_age(item, max_age);
 		passim_item_set_share_limit(item, share_limit);
 

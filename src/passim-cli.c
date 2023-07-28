@@ -12,6 +12,7 @@
 
 typedef struct {
 	PassimClient *client;
+	gboolean next_reboot;
 } PassimCli;
 
 typedef gboolean (*PassimCliCmdFunc)(PassimCli *util, gchar **values, GError **error);
@@ -197,6 +198,8 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 		passim_item_set_max_age(item, g_ascii_strtoull(values[1], NULL, 10));
 	if (g_strv_length(values) > 2)
 		passim_item_set_share_count(item, g_ascii_strtoull(values[2], NULL, 10));
+	if (self->next_reboot)
+		passim_item_add_flag(item, PASSIM_ITEM_FLAG_NEXT_REBOOT);
 	if (!passim_client_publish(self->client, item, error))
 		return FALSE;
 
@@ -217,6 +220,7 @@ main(int argc, char *argv[])
 	g_autoptr(GPtrArray) cmd_array = passim_cli_cmd_array_new();
 	const GOptionEntry options[] = {
 	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
+	    {"next-reboot", '\0', 0, G_OPTION_ARG_NONE, &self->next_reboot, "Next reboot", NULL},
 	    {NULL}};
 	passim_cli_cmd_array_add(cmd_array, "dump", NULL, "Dump files shared", passim_cli_dump);
 	passim_cli_cmd_array_add(cmd_array,

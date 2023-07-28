@@ -34,5 +34,7 @@ gchar *
 passim_xattr_get_string(const gchar *filename, const gchar *name, GError **error);
 gboolean
 passim_mkdir(const gchar *dirname, GError **error);
+gchar *
+passim_get_boot_time(void);
 GBytes *
 passim_load_input_stream(GInputStream *stream, gsize count, GError **error);

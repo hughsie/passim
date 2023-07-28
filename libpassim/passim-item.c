@@ -16,6 +16,7 @@
 
 typedef struct {
 	gchar *hash;
+	PassimItemFlags flags;
 	gchar *basename;
 	gchar *cmdline;
 	guint32 max_age;
@@ -416,6 +417,7 @@ passim_item_to_variant(PassimItem *self)
 	g_variant_builder_add(&builder, "{sv}", "cmdline", g_variant_new_string(priv->cmdline));
 	g_variant_builder_add(&builder, "{sv}", "hash", g_variant_new_string(priv->hash));
 	g_variant_builder_add(&builder, "{sv}", "max-age", g_variant_new_uint32(priv->max_age));
+	g_variant_builder_add(&builder, "{sv}", "flags", g_variant_new_uint64(priv->flags));
 	g_variant_builder_add(&builder,
 			      "{sv}",
 			      "share-limit",
@@ -462,9 +464,183 @@ passim_item_from_variant(GVariant *variant)
 			priv->share_limit = g_variant_get_uint32(value);
 		if (g_strcmp0(key, "share-count") == 0)
 			priv->share_count = g_variant_get_uint32(value);
+		if (g_strcmp0(key, "flags") == 0)
+			priv->flags = g_variant_get_uint64(value);
 		g_variant_unref(value);
 	}
 	return g_steal_pointer(&self);
+}
+
+/**
+ * passim_item_get_flags:
+ * @self: a #PassimItem
+ *
+ * Gets the item flags.
+ *
+ * Returns: item flags, or 0 if unset
+ *
+ * Since: 0.1.0
+ **/
+guint64
+passim_item_get_flags(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
+	return priv->flags;
+}
+
+/**
+ * passim_item_get_flags_as_string:
+ * @self: a #PassimItem
+ *
+ * Gets the item flags.
+ *
+ * Returns: string
+ *
+ * Since: 0.1.0
+ **/
+gchar *
+passim_item_get_flags_as_string(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_autoptr(GString) str = g_string_new(NULL);
+
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
+
+	for (guint i = 0; i < 64; i++) {
+		if ((priv->flags & ((guint64)1 << i)) == 0)
+			continue;
+		if (str->len > 0)
+			g_string_append(str, ",");
+		g_string_append(str, passim_item_flag_to_string((guint64)1 << i));
+	}
+	if (str->len == 0)
+		g_string_append(str, passim_item_flag_to_string(PASSIM_ITEM_FLAG_NONE));
+	return g_string_free(g_steal_pointer(&str), FALSE);
+}
+
+/**
+ * passim_item_set_flags:
+ * @self: a #PassimItem
+ * @flags: item flags, e.g. %PASSIM_ITEM_FLAG_NEXT_REBOOT
+ *
+ * Sets the item flags.
+ *
+ * Since: 0.1.0
+ **/
+void
+passim_item_set_flags(PassimItem *self, guint64 flags)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+	if (priv->flags == flags)
+		return;
+	priv->flags = flags;
+}
+
+/**
+ * passim_item_add_flag:
+ * @self: a #PassimItem
+ * @flag: the #PassimItemFlags
+ *
+ * Adds a specific item flag to the item.
+ *
+ * Since: 0.1.0
+ **/
+void
+passim_item_add_flag(PassimItem *self, PassimItemFlags flag)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+	if (flag == 0)
+		return;
+	if ((priv->flags & flag) > 0)
+		return;
+	priv->flags |= flag;
+}
+
+/**
+ * passim_item_remove_flag:
+ * @self: a #PassimItem
+ * @flag: a item flag
+ *
+ * Removes a specific item flag from the item.
+ *
+ * Since: 0.1.0
+ **/
+void
+passim_item_remove_flag(PassimItem *self, PassimItemFlags flag)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+	if (flag == 0)
+		return;
+	if ((priv->flags & flag) == 0)
+		return;
+	priv->flags &= ~flag;
+}
+
+/**
+ * passim_item_has_flag:
+ * @self: a #PassimItem
+ * @flag: a item flag
+ *
+ * Finds if the item has a specific item flag.
+ *
+ * Returns: %TRUE if the flag is set
+ *
+ * Since: 0.1.0
+ **/
+gboolean
+passim_item_has_flag(PassimItem *self, PassimItemFlags flag)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), FALSE);
+	return (priv->flags & flag) > 0;
+}
+
+/**
+ * passim_item_flag_to_string:
+ * @item_flag: item flags, e.g. %PASSIM_ITEM_FLAG_NEXT_REBOOT
+ *
+ * Converts an enumerated item flag to a string.
+ *
+ * Returns: identifier string
+ *
+ * Since: 0.1.0
+ **/
+const gchar *
+passim_item_flag_to_string(PassimItemFlags item_flag)
+{
+	if (item_flag == PASSIM_ITEM_FLAG_NONE)
+		return "none";
+	if (item_flag == PASSIM_ITEM_FLAG_DISABLED)
+		return "disabled";
+	if (item_flag == PASSIM_ITEM_FLAG_NEXT_REBOOT)
+		return "next-reboot";
+	return NULL;
+}
+
+/**
+ * passim_item_flag_from_string:
+ * @item_flag: (nullable): a string, e.g. `next-reboot`
+ *
+ * Converts a string to an enumerated item flag.
+ *
+ * Returns: enumerated value
+ *
+ * Since: 0.1.0
+ **/
+PassimItemFlags
+passim_item_flag_from_string(const gchar *item_flag)
+{
+	if (g_strcmp0(item_flag, "none") == 0)
+		return PASSIM_ITEM_FLAG_NONE;
+	if (g_strcmp0(item_flag, "disabled") == 0)
+		return PASSIM_ITEM_FLAG_DISABLED;
+	if (g_strcmp0(item_flag, "next-reboot") == 0)
+		return PASSIM_ITEM_FLAG_NEXT_REBOOT;
+	return PASSIM_ITEM_FLAG_UNKNOWN;
 }
 
 /**
@@ -481,10 +657,13 @@ gchar *
 passim_item_to_string(PassimItem *self)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_autofree gchar *flags = passim_item_get_flags_as_string(self);
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
-	return g_strdup_printf("%s %s (cmdline: %s, max-age: %u, share-count: %u, share-limit: %u)",
+	return g_strdup_printf("%s %s (flags: %s, cmdline: %s, max-age: %u, "
+			       "share-count: %u, share-limit: %u)",
 			       priv->hash,
 			       priv->basename,
+			       flags,
 			       priv->cmdline,
 			       priv->max_age,
 			       priv->share_count,

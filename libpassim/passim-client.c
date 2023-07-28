@@ -165,9 +165,10 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 
 	/* call into daemon */
 	g_dbus_message_set_body(request,
-				g_variant_new("(hsuu)",
+				g_variant_new("(hstuu)",
 					      g_io_channel_unix_get_fd(io),
 					      passim_item_get_basename(item),
+					      passim_item_get_flags(item),
 					      passim_item_get_max_age(item),
 					      passim_item_get_share_limit(item)));
 	reply =

@@ -58,6 +58,13 @@
           </doc:summary>
         </doc:doc>
       </arg>
+      <arg type='t' name='flags' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>Flags affecting how the item is handled.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
       <arg type='u' name='max_age' direction='in'>
         <doc:doc>
           <doc:summary>
