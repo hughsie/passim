@@ -192,8 +192,6 @@ passim_http_code_to_string(guint error_code)
 		return "Only GET implemented";
 	if (error_code == 505)
 		return "HTTP Version Not Supported";
-	if (error_code == 404)
-		return "Not Found";
 	return "Unknown";
 }
 
