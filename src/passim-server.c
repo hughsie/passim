@@ -171,6 +171,7 @@ typedef struct {
 	GSocketConnection *connection;
 	gchar *hash;
 	gchar *basename;
+	gboolean addr_loopback;
 } PassimServerContext;
 
 static void
@@ -463,9 +464,11 @@ passim_server_handler_cb(GSocketService *service,
 	}
 	inet_addr = g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(socket_addr));
 	inet_addrstr = g_inet_address_to_string(inet_addr);
-	g_info("accepting connection from %s:%u",
+	ctx->addr_loopback = passim_server_is_loopback(inet_addrstr);
+	g_info("accepting connection from %s:%u (%s)",
 	       inet_addrstr,
-	       g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(socket_addr)));
+	       g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(socket_addr)),
+	       ctx->addr_loopback ? "loopback" : "remote");
 
 	/* be tolerant of input */
 	data = g_data_input_stream_new(in);
@@ -497,7 +500,7 @@ passim_server_handler_cb(GSocketService *service,
 
 	/* just return the index */
 	if (g_strcmp0(unescaped, "/") == 0) {
-		if (!passim_server_is_loopback(inet_addrstr)) {
+		if (!ctx->addr_loopback) {
 			passim_server_context_send_error(ctx, 403, NULL);
 			return TRUE;
 		}
@@ -508,7 +511,7 @@ passim_server_handler_cb(GSocketService *service,
 		g_autofree gchar *fn =
 		    g_build_filename(PACKAGE_DATADIR, PACKAGE_NAME, unescaped, NULL);
 		g_autoptr(GFile) file = g_file_new_for_path(fn);
-		if (!passim_server_is_loopback(inet_addrstr)) {
+		if (!ctx->addr_loopback) {
 			passim_server_context_send_error(ctx, 403, NULL);
 			return TRUE;
 		}
@@ -540,6 +543,12 @@ passim_server_handler_cb(GSocketService *service,
 	item = g_hash_table_lookup(self->items, hash);
 	if (g_strcmp0(request[0], "HELLO.md") != 0 && item != NULL) {
 		passim_server_context_send_item(ctx, item);
+		return TRUE;
+	}
+
+	/* only localhost is allowed to scan for hashes */
+	if (!ctx->addr_loopback) {
+		passim_server_context_send_error(ctx, 403, NULL);
 		return TRUE;
 	}
 
