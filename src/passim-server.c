@@ -25,6 +25,7 @@ typedef struct {
 	guint owner_id;
 	guint poll_item_age_id;
 	guint timed_exit_id;
+	gboolean http_active;
 } PassimServer;
 
 static void
@@ -73,8 +74,18 @@ static gboolean
 passim_server_avahi_register(PassimServer *self, GError **error)
 {
 	guint keyidx = 0;
-	g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
-	g_autofree const gchar **keys = g_new0(const gchar *, items->len + 1);
+	g_autofree const gchar **keys = NULL;
+	g_autoptr(GPtrArray) items = NULL;
+
+	/* sanity check */
+	if (!self->http_active) {
+		g_set_error(error, G_IO_ERROR, G_IO_ERROR_NOT_MOUNTED, "http server has not yet started");
+		return FALSE;
+	}
+
+	/* build a GStrv of hashes */
+	items = g_hash_table_get_values_as_ptr_array(self->items);
+	keys = g_new0(const gchar *, items->len + 1);
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
 		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED))
@@ -1037,10 +1048,6 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	passim_server_check_item_age(self);
-	if (!passim_server_avahi_register(self, &error)) {
-		g_warning("failed to register: %s", error->message);
-		return 1;
-	}
 
 	/* set up the webserver */
 	if (!g_socket_listener_add_inet_port(G_SOCKET_LISTENER(service),
@@ -1052,6 +1059,14 @@ main(int argc, char *argv[])
 	}
 	g_info("HTTP server listening on port %d", self->port);
 	g_signal_connect(service, "incoming", G_CALLBACK(passim_server_handler_cb), self);
+	self->http_active = TRUE;
+
+	/* register objects with Avahi */
+	if (!passim_server_avahi_register(self, &error)) {
+		g_warning("failed to register: %s", error->message);
+		return 1;
+	}
+
 	g_main_loop_run(self->loop);
 	return 0;
 }
