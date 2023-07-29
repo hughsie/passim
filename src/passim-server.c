@@ -75,7 +75,7 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 {
 	guint keyidx = 0;
 	g_autofree const gchar **keys = NULL;
-	g_autoptr(GPtrArray) items = NULL;
+	g_autoptr(GList) items = NULL;
 
 	/* sanity check */
 	if (!self->http_active) {
@@ -87,10 +87,10 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 	}
 
 	/* build a GStrv of hashes */
-	items = g_hash_table_get_values_as_ptr_array(self->items);
-	keys = g_new0(const gchar *, items->len + 1);
-	for (guint i = 0; i < items->len; i++) {
-		PassimItem *item = g_ptr_array_index(items, i);
+	items = g_hash_table_get_values(self->items);
+	keys = g_new0(const gchar *, g_list_length(items) + 1);
+	for (GList *l = items; l != NULL; l = l->next) {
+		PassimItem *item = PASSIM_ITEM(l->data);
 		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED))
 			continue;
 		keys[keyidx++] = passim_item_get_hash(item);
@@ -667,10 +667,10 @@ passim_server_timed_exit_cb(gpointer user_data)
 static void
 passim_server_check_item_age(PassimServer *self)
 {
-	g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
+	g_autoptr(GList) items = g_hash_table_get_values(self->items);
 	g_info("checking for max-age");
-	for (guint i = 0; i < items->len; i++) {
-		PassimItem *item = g_ptr_array_index(items, i);
+	for (GList *l = items; l != NULL; l = l->next) {
+		PassimItem *item = PASSIM_ITEM(l->data);
 		guint32 age = passim_item_get_age(item);
 
 		if (age > passim_item_get_max_age(item)) {
@@ -770,12 +770,12 @@ passim_server_method_call(GDBusConnection *connection,
 
 	if (g_strcmp0(method_name, "GetItems") == 0) {
 		GVariantBuilder builder;
-		g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
+		g_autoptr(GList) items = g_hash_table_get_values(self->items);
 
 		g_debug("Called %s()", method_name);
 		g_variant_builder_init(&builder, G_VARIANT_TYPE("aa{sv}"));
-		for (guint i = 0; i < items->len; i++) {
-			PassimItem *item = g_ptr_array_index(items, i);
+		for (GList *l = items; l != NULL; l = l->next) {
+			PassimItem *item = PASSIM_ITEM(l->data);
 			g_variant_builder_add_value(&builder, passim_item_to_variant(item));
 		}
 		val = g_variant_builder_end(&builder);
