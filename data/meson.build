@@ -11,13 +11,15 @@ install_data(['org.freedesktop.Passim.png'],
 con2 = configuration_data()
 con2.set('sbindir', sbindir)
 con2.set('localstatedir', localstatedir)
-configure_file(
-  input: 'passim.service.in',
-  output: 'passim.service',
-  configuration: con2,
-  install: true,
-  install_dir: systemdunitdir,
-)
+if systemd.found()
+  configure_file(
+    input: 'passim.service.in',
+    output: 'passim.service',
+    configuration: con2,
+    install: true,
+    install_dir: systemdunitdir,
+  )
+endif
 configure_file(
   input: 'org.freedesktop.Passim.service.in',
   output: 'org.freedesktop.Passim.service',

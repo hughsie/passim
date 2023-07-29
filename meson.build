@@ -90,12 +90,14 @@ conf.set('MAJOR_VERSION', varr[0])
 conf.set('MINOR_VERSION', varr[1])
 conf.set('MICRO_VERSION', varr[2])
 
-systemd = dependency('systemd', version: '>= 211')
-systemd_root_prefix = get_option('systemd_root_prefix')
-if systemd_root_prefix == ''
-  systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
-else
-  systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir', pkgconfig_define: ['rootprefix', systemd_root_prefix])
+systemd = dependency('systemd', version: '>= 211', required: get_option('systemd'))
+if systemd.found()
+  systemd_root_prefix = get_option('systemd_root_prefix')
+  if systemd_root_prefix == ''
+    systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
+  else
+    systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir', pkgconfig_define: ['rootprefix', systemd_root_prefix])
+  endif
 endif
 
 # get source version, falling back to package version

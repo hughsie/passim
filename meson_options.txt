@@ -1,2 +1,3 @@
+option('systemd', type: 'feature', description: 'Enable installation of systemd unit files')
 option('systemd_root_prefix', type: 'string', value: '', description: 'Directory to base systemd’s installation directories on')
 option('introspection', type : 'feature', description : 'generate GObject Introspection data')
