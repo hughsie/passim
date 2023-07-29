@@ -541,7 +541,11 @@ passim_server_handler_cb(GSocketService *service,
 
 	/* already exists locally */
 	item = g_hash_table_lookup(self->items, hash);
-	if (g_strcmp0(request[0], "HELLO.md") != 0 && item != NULL) {
+	if (item != NULL) {
+		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED)) {
+			passim_server_context_send_error(ctx, 423, NULL);
+			return TRUE;
+		}
 		passim_server_context_send_item(ctx, item);
 		return TRUE;
 	}

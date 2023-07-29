@@ -188,10 +188,20 @@ passim_http_code_to_string(guint error_code)
 		return "Forbidden";
 	if (error_code == 404)
 		return "Not Found";
+	if (error_code == 423)
+		return "Locked";
+	if (error_code == 429)
+		return "Too Many Requests";
 	if (error_code == 501)
-		return "Only GET implemented";
+		return "Not Implemented";
+	if (error_code == 503)
+		return "Service Unavailable";
 	if (error_code == 505)
 		return "HTTP Version Not Supported";
+	if (error_code == 507)
+		return "Insufficient Storage";
+	if (error_code == 508)
+		return "Loop Detected";
 	return "Unknown";
 }
 
