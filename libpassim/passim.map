@@ -12,6 +12,7 @@ LIBPASSIM_0.1.0 {
     passim_item_flag_from_string;
     passim_item_flag_to_string;
     passim_item_from_variant;
+    passim_item_get_age;
     passim_item_get_basename;
     passim_item_get_cmdline;
     passim_item_get_ctime;

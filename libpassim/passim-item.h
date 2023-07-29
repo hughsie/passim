@@ -88,6 +88,8 @@ passim_item_get_cmdline(PassimItem *self);
 void
 passim_item_set_cmdline(PassimItem *self, const gchar *cmdline);
 guint32
+passim_item_get_age(PassimItem *self);
+guint32
 passim_item_get_max_age(PassimItem *self);
 void
 passim_item_set_max_age(PassimItem *self, guint32 max_age);

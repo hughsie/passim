@@ -272,7 +272,7 @@ passim_server_send_index(PassimServerContext *ctx)
 		g_string_append(html, "<th>Filename</th>\n");
 		g_string_append(html, "<th>Hash</th>\n");
 		g_string_append(html, "<th>Binary</th>\n");
-		g_string_append(html, "<th>Max Age</th>\n");
+		g_string_append(html, "<th>Age</th>\n");
 		g_string_append(html, "<th>Shared</th>\n");
 		g_string_append(html, "<th>Flags</th>\n");
 		g_string_append(html, "</tr>\n");
@@ -296,8 +296,9 @@ passim_server_send_index(PassimServerContext *ctx)
 					       "<td><code>%s</code></td>\n",
 					       passim_item_get_cmdline(item));
 			g_string_append_printf(html,
-					       "<td>%uh</td>\n",
-					       passim_item_get_max_age(item));
+					       "<td>%u/%uh</td>\n",
+					       passim_item_get_age(item) / 3600u,
+					       passim_item_get_max_age(item) / 3600u);
 			g_string_append_printf(html,
 					       "<td>%u / %u</td>\n",
 					       passim_item_get_share_count(item),
@@ -634,18 +635,14 @@ passim_server_timed_exit_cb(gpointer user_data)
 	return G_SOURCE_REMOVE;
 }
 
-static gboolean
-passim_server_poll_item_age_cb(gpointer user_data)
+static void
+passim_server_check_item_age(PassimServer *self)
 {
-	PassimServer *self = (PassimServer *)user_data;
-	g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
 	g_autoptr(GPtrArray) items = g_hash_table_get_values_as_ptr_array(self->items);
-
 	g_info("checking for max-age");
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
-		gint64 age =
-		    g_date_time_difference(dt_now, passim_item_get_ctime(item)) / G_TIME_SPAN_HOUR;
+		guint32 age = passim_item_get_age(item);
 		if (age > passim_item_get_max_age(item)) {
 			g_debug("deleting %s [%s] as max-age reached",
 				passim_item_get_hash(item),
@@ -659,7 +656,13 @@ passim_server_poll_item_age_cb(gpointer user_data)
 				passim_item_get_max_age(item));
 		}
 	}
+}
 
+static gboolean
+passim_server_check_item_age_cb(gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	passim_server_check_item_age(self);
 	return G_SOURCE_CONTINUE;
 }
 
@@ -1000,7 +1003,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	self->poll_item_age_id =
-	    g_timeout_add_seconds(60 * 60, passim_server_poll_item_age_cb, self);
+	    g_timeout_add_seconds(60 * 60, passim_server_check_item_age_cb, self);
 	if (timed_exit)
 		self->timed_exit_id = g_timeout_add_seconds(10, passim_server_timed_exit_cb, self);
 	self->avahi = passim_avahi_new(self->kf);
@@ -1020,6 +1023,7 @@ main(int argc, char *argv[])
 		g_warning("failed to contact daemon: %s", error->message);
 		return 1;
 	}
+	passim_server_check_item_age(self);
 	if (!passim_server_avahi_register(self, &error)) {
 		g_warning("failed to register: %s", error->message);
 		return 1;

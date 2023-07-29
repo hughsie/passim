@@ -153,12 +153,33 @@ passim_item_set_cmdline(PassimItem *self, const gchar *cmdline)
 }
 
 /**
+ * passim_item_get_age:
+ * @self: a #PassimItem
+ *
+ * Gets the current file age.
+ *
+ * Returns: time in seconds, or 0 for invalid.
+ *
+ * Since: 0.1.0
+ **/
+guint32
+passim_item_get_age(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
+	if (priv->ctime == NULL)
+		return 0;
+	return g_date_time_difference(dt_now, priv->ctime) / G_TIME_SPAN_SECOND;
+}
+
+/**
  * passim_item_get_max_age:
  * @self: a #PassimItem
  *
  * Gets the maximum permitted file age.
  *
- * Returns: time in hours
+ * Returns: time in seconds
  *
  * Since: 0.1.0
  **/
@@ -173,7 +194,7 @@ passim_item_get_max_age(PassimItem *self)
 /**
  * passim_item_set_max_age:
  * @self: a #PassimItem
- * @max_age: time in hours
+ * @max_age: time in seconds
  *
  * Sets the maximum permitted file age.
  *
@@ -659,12 +680,12 @@ passim_item_to_string(PassimItem *self)
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_autofree gchar *flags = passim_item_get_flags_as_string(self);
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
-	return g_strdup_printf("%s %s (flags: %s, cmdline: %s, max-age: %u, "
-			       "share-count: %u, share-limit: %u)",
+	return g_strdup_printf("%s %s (flags: %s, cmdline: %s, age: %u/%u, share: %u/%u)",
 			       priv->hash,
 			       priv->basename,
 			       flags,
 			       priv->cmdline,
+			       passim_item_get_age(self),
 			       priv->max_age,
 			       priv->share_count,
 			       priv->share_limit);
