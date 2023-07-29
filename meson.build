@@ -114,7 +114,7 @@ conf.set_quoted('SOURCE_VERSION', source_version)
 
 root_incdir = include_directories('.')
 
-libgio = dependency('gio-unix-2.0', version: '>= 2.76.0')
+libgio = dependency('gio-unix-2.0', version: '>= 2.68.0')
 
 configure_file(
   output: 'config.h',
