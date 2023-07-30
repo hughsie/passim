@@ -80,6 +80,22 @@
         </doc:doc>
       </arg>
     </method>
+    <method name='Unpublish'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            Unpublish a file from the index.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+      <arg type='s' name='hash' direction='in'>
+        <doc:doc>
+          <doc:summary>
+            <doc:para>The hash of the file to unpublish.</doc:para>
+          </doc:summary>
+        </doc:doc>
+      </arg>
+    </method>
     <signal name='Changed'>
       <doc:doc>
         <doc:description>

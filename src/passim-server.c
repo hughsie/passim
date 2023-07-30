@@ -79,7 +79,10 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 
 	/* sanity check */
 	if (!self->http_active) {
-		g_set_error(error, G_IO_ERROR, G_IO_ERROR_NOT_MOUNTED, "http server has not yet started");
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_NOT_MOUNTED,
+			    "http server has not yet started");
 		return FALSE;
 	}
 
@@ -372,19 +375,19 @@ passim_server_context_send_file(PassimServerContext *ctx, GFile *file, GPtrArray
 	g_input_stream_close(G_INPUT_STREAM(file_in), NULL, NULL);
 }
 
-static void
-passim_server_delete_item(PassimServer *self, PassimItem *item)
+static gboolean
+passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 {
-	g_autoptr(GError) error = NULL;
-	if (!g_file_delete(passim_item_get_file(item), NULL, &error)) {
-		g_warning("failed to delete %s: %s", passim_item_get_hash(item), error->message);
-		return;
+	if (!g_file_delete(passim_item_get_file(item), NULL, error)) {
+		g_prefix_error(error, "failed to delete %s: ", passim_item_get_hash(item));
+		return FALSE;
 	}
 	g_hash_table_remove(self->items, passim_item_get_hash(item));
-	if (!passim_server_avahi_register(self, &error)) {
-		g_warning("failed to register: %s", error->message);
-		return;
+	if (!passim_server_avahi_register(self, error)) {
+		g_prefix_error(error, "failed to register: ");
+		return FALSE;
 	}
+	return TRUE;
 }
 
 static void
@@ -401,8 +404,10 @@ passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
 
 	/* we've shared this enough now */
 	if (passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
+		g_autoptr(GError) error = NULL;
 		g_debug("deleting %s as share limit reached", passim_item_get_hash(item));
-		passim_server_delete_item(self, item);
+		if (!passim_server_delete_item(self, item, &error))
+			g_warning("failed: %s", error->message);
 	}
 }
 
@@ -667,11 +672,14 @@ passim_server_check_item_age(PassimServer *self)
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
 		guint32 age = passim_item_get_age(item);
+
 		if (age > passim_item_get_max_age(item)) {
+			g_autoptr(GError) error = NULL;
 			g_debug("deleting %s [%s] as max-age reached",
 				passim_item_get_hash(item),
 				passim_item_get_basename(item));
-			passim_server_delete_item(self, item);
+			if (!passim_server_delete_item(self, item, &error))
+				g_warning("failed: %s", error->message);
 		} else {
 			g_debug("%s [%s] has age %uh, maximum is %uh",
 				passim_item_get_hash(item),
@@ -858,6 +866,34 @@ passim_server_method_call(GDBusConnection *connection,
 
 		/* publish the new file */
 		if (!passim_server_publish_file(self, blob, item, &error)) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+		g_dbus_method_invocation_return_value(invocation, NULL);
+		return;
+	}
+	if (g_strcmp0(method_name, "Unpublish") == 0) {
+		const gchar *hash = NULL;
+		PassimItem *item;
+		g_autoptr(GError) error = NULL;
+
+		/* only callable by root */
+		if (!passim_server_sender_check_uid(self, sender, &error)) {
+			g_dbus_method_invocation_return_gerror(invocation, error);
+			return;
+		}
+
+		g_variant_get(parameters, "(&s)", &hash);
+		item = g_hash_table_lookup(self->items, hash);
+		if (item == NULL) {
+			g_dbus_method_invocation_return_error(invocation,
+							      G_IO_ERROR,
+							      G_IO_ERROR_NOT_FOUND,
+							      "%s not found",
+							      hash);
+			return;
+		}
+		if (!passim_server_delete_item(self, item, &error)) {
 			g_dbus_method_invocation_return_gerror(invocation, error);
 			return;
 		}

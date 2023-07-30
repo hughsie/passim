@@ -209,6 +209,27 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 	return TRUE;
 }
 
+static gboolean
+passim_cli_unpublish(PassimCli *self, gchar **values, GError **error)
+{
+	g_autofree gchar *str = NULL;
+
+	/* parse args */
+	if (g_strv_length(values) != 1) {
+		g_set_error_literal(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_ARGUMENT,
+				    "Invalid arguments");
+		return FALSE;
+	}
+	if (!passim_client_unpublish(self->client, values[0], error))
+		return FALSE;
+
+	/* success */
+	g_print("Unpublished: %s\n", values[0]);
+	return TRUE;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -228,6 +249,11 @@ main(int argc, char *argv[])
 				 "FILENAME [MAX-AGE] [MAX-SHARE]",
 				 "Publish an additional file",
 				 passim_cli_publish);
+	passim_cli_cmd_array_add(cmd_array,
+				 "unpublish",
+				 "HASH",
+				 "Unpublish an existing file",
+				 passim_cli_unpublish);
 	passim_cli_cmd_array_sort(cmd_array);
 
 	cmd_descriptions = passim_cli_cmd_array_to_string(cmd_array);

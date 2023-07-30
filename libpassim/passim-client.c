@@ -125,6 +125,39 @@ passim_client_get_items(PassimClient *self, GError **error)
 }
 
 /**
+ * passim_client_unpublish:
+ * @self: a #PassimClient
+ * @hash: (not nullable): an item hash value
+ * @error: (nullable): optional return location for an error
+ *
+ * Unpublish a file from the index.
+ *
+ * Returns: %TRUE for success
+ *
+ * Since: 0.1.0
+ **/
+gboolean
+passim_client_unpublish(PassimClient *self, const gchar *hash, GError **error)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_autoptr(GVariant) val = NULL;
+
+	g_return_val_if_fail(PASSIM_IS_CLIENT(self), FALSE);
+	g_return_val_if_fail(priv->proxy != NULL, FALSE);
+	g_return_val_if_fail(hash != NULL, FALSE);
+	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+
+	val = g_dbus_proxy_call_sync(priv->proxy,
+				     "Unpublish",
+				     g_variant_new("(s)", hash),
+				     G_DBUS_CALL_FLAGS_NONE,
+				     1500,
+				     NULL,
+				     error);
+	return val != NULL;
+}
+
+/**
  * passim_client_publish:
  * @self: a #PassimClient
  * @item: (not nullable): a #PassimItem

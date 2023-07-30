@@ -8,6 +8,7 @@ LIBPASSIM_0.1.0 {
     passim_client_load;
     passim_client_new;
     passim_client_publish;
+    passim_client_unpublish;
     passim_item_add_flag;
     passim_item_flag_from_string;
     passim_item_flag_to_string;

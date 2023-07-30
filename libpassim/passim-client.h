@@ -39,5 +39,7 @@ GPtrArray *
 passim_client_get_items(PassimClient *self, GError **error);
 gboolean
 passim_client_publish(PassimClient *self, PassimItem *item, GError **error);
+gboolean
+passim_client_unpublish(PassimClient *self, const gchar *hash, GError **error);
 
 G_END_DECLS
