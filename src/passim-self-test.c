@@ -51,23 +51,29 @@ passim_test_loop_quit(void)
 static void
 passim_common_func(void)
 {
-	const gchar *xargs_fn = "/var/tmp/passim/test.conf";
 	gboolean ret;
 	guint32 value_u32;
 	g_autofree gchar *boot_time = NULL;
 	g_autofree gchar *value_str1 = NULL;
 	g_autofree gchar *value_str2 = NULL;
+	g_autofree gchar *xargs_fn = NULL;
+	g_autofree gchar *xargs_path = NULL;
 	g_autoptr(GError) error = NULL;
 
 	/* ensure we got *something* */
 	boot_time = passim_get_boot_time();
 	g_assert_cmpstr(boot_time, !=, NULL);
 
+	/* check HTTP status codes */
+	g_assert_cmpstr(passim_http_code_to_string(404), ==, "Not Found");
+
 	/* create dir for next step */
-	ret = passim_mkdir("/var/tmp/passim", &error);
+	xargs_fn = g_test_build_filename(G_TEST_BUILT, "tests", "test.conf", NULL);
+	xargs_path = g_path_get_dirname(xargs_fn);
+	ret = passim_mkdir(xargs_path, &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);
-	ret = passim_mkdir("/var/tmp/passim", &error);
+	ret = passim_mkdir(xargs_path, &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);
 
@@ -77,6 +83,10 @@ passim_common_func(void)
 	g_assert_no_error(error);
 	g_assert_true(ret);
 	ret = passim_xattr_set_uint32(xargs_fn, "user.test_u32", 123, &error);
+	if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED)) {
+		g_test_skip("no xattr support");
+		return;
+	}
 	g_assert_no_error(error);
 	g_assert_true(ret);
 	ret = passim_xattr_set_string(xargs_fn, "user.test_str", "hey", &error);
@@ -94,9 +104,6 @@ passim_common_func(void)
 	value_str2 = passim_xattr_get_string(xargs_fn, "user.test_MISSING", &error);
 	g_assert_no_error(error);
 	g_assert_cmpstr(value_str2, ==, "");
-
-	/* check HTTP status codes */
-	g_assert_cmpstr(passim_http_code_to_string(404), ==, "Not Found");
 }
 
 int
@@ -105,6 +112,7 @@ main(int argc, char **argv)
 	g_autofree gchar *testdatadir = NULL;
 
 	(void)g_setenv("G_TEST_SRCDIR", SRCDIR, FALSE);
+	(void)g_setenv("G_TEST_BUILDDIR", BUILDDIR, FALSE);
 	g_test_init(&argc, &argv, NULL);
 
 	/* only critical and error are fatal */

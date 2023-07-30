@@ -70,6 +70,7 @@ e = executable(
   ],
   c_args: [
     '-DSRCDIR="' + meson.current_source_dir() + '"',
+    '-DBUILDDIR="' + meson.current_build_dir() + '"',
   ],
 )
 test('passim-self-test', e, is_parallel: false, timeout: 180, env: env)
