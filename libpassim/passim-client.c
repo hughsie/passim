@@ -6,6 +6,8 @@
 
 #include "config.h"
 
+#include <gio/gunixfdlist.h>
+
 #include "passim-client.h"
 
 /**

@@ -367,7 +367,7 @@ passim_compute_checksum_for_filename(const gchar *filename, GError **error)
 	return g_compute_checksum_for_data(G_CHECKSUM_SHA256, (const guchar *)buf, bufsz);
 }
 
-#if !GLIB_CHECK_VERSION(2,70,0)
+#if !GLIB_CHECK_VERSION(2, 70, 0)
 static GDateTime *
 g_file_info_get_creation_date_time(GFileInfo *info)
 {

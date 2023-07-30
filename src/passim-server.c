@@ -6,6 +6,7 @@
 
 #include "config.h"
 
+#include <gio/gunixfdlist.h>
 #include <gio/gunixinputstream.h>
 #include <passim.h>
 
