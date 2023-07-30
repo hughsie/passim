@@ -140,7 +140,7 @@ passim_xattr_set_uint32(const gchar *filename, const gchar *name, guint32 value,
 	return TRUE;
 }
 
-guint64
+guint32
 passim_xattr_get_uint32(const gchar *filename,
 			const gchar *name,
 			guint32 value_fallback,

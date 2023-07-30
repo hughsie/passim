@@ -48,3 +48,28 @@ executable(
   install: true,
   install_dir: bindir,
 )
+
+env = environment()
+env.set('G_TEST_SRCDIR', meson.current_source_dir())
+env.set('G_TEST_BUILDDIR', meson.current_build_dir())
+e = executable(
+  'passim-self-test',
+  sources: [
+    'passim-common.c',
+    'passim-self-test.c',
+  ],
+  include_directories: [
+    root_incdir,
+    passim_incdir,
+  ],
+  dependencies: [
+    libgio
+  ],
+  link_with: [
+    passim
+  ],
+  c_args: [
+    '-DSRCDIR="' + meson.current_source_dir() + '"',
+  ],
+)
+test('passim-self-test', e, is_parallel: false, timeout: 180, env: env)

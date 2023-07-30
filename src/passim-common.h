@@ -20,7 +20,7 @@ const gchar *
 passim_http_code_to_string(guint error_code);
 gboolean
 passim_xattr_set_uint32(const gchar *filename, const gchar *name, guint32 value, GError **error);
-guint64
+guint32
 passim_xattr_get_uint32(const gchar *filename,
 			const gchar *name,
 			guint32 value_fallback,
