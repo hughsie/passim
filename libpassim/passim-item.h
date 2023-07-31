@@ -105,6 +105,10 @@ GFile *
 passim_item_get_file(PassimItem *self);
 void
 passim_item_set_file(PassimItem *self, GFile *file);
+GBytes *
+passim_item_get_bytes(PassimItem *self);
+void
+passim_item_set_bytes(PassimItem *self, GBytes *bytes);
 GDateTime *
 passim_item_get_ctime(PassimItem *self);
 void

@@ -71,6 +71,9 @@ cc = meson.get_compiler('c')
 add_project_arguments(cc.get_supported_arguments(warning_flags), language: 'c')
 add_project_arguments('-DPASSIM_COMPILATION', language: 'c')
 
+# needed for memfd_create()
+add_project_arguments('-D_GNU_SOURCE', language: 'c')
+
 prefix = get_option('prefix')
 sysconfdir = join_paths(prefix, get_option('sysconfdir'))
 bindir = join_paths(prefix, get_option('bindir'))
@@ -115,6 +118,10 @@ conf.set_quoted('SOURCE_VERSION', source_version)
 root_incdir = include_directories('.')
 
 libgio = dependency('gio-unix-2.0', version: '>= 2.68.0')
+
+if cc.has_function('memfd_create')
+  conf.set('HAVE_MEMFD_CREATE', '1')
+endif
 
 configure_file(
   output: 'config.h',

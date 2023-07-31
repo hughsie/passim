@@ -23,6 +23,7 @@ typedef struct {
 	guint32 share_limit;
 	guint32 share_count;
 	GFile *file;
+	GBytes *bytes;
 	GDateTime *ctime;
 } PassimItemPrivate;
 
@@ -314,6 +315,54 @@ passim_item_set_file(PassimItem *self, GFile *file)
 }
 
 /**
+ * passim_item_get_bytes:
+ * @self: a #PassimItem
+ *
+ * Gets the local bytes in the cache.
+ *
+ * Returns: (transfer none): a #GBytes, or %NULL if unset
+ *
+ * Since: 0.1.0
+ **/
+GBytes *
+passim_item_get_bytes(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
+	return priv->bytes;
+}
+
+/**
+ * passim_item_set_bytes:
+ * @self: a #PassimItem
+ * @bytes: (nullable): a #GBytes
+ *
+ * Sets the local bytes in the cache.
+ *
+ * Since: 0.1.0
+ **/
+void
+passim_item_set_bytes(PassimItem *self, GBytes *bytes)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+
+	/* unchanged */
+	if (bytes == priv->bytes)
+		return;
+	if (priv->bytes != NULL) {
+		g_bytes_unref(priv->bytes);
+		priv->bytes = NULL;
+	}
+	if (bytes != NULL)
+		priv->bytes = g_bytes_ref(bytes);
+
+	/* generate checksum */
+	if (bytes != NULL && priv->hash == NULL)
+		priv->hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, bytes);
+}
+
+/**
  * passim_item_get_ctime:
  * @self: a #PassimItem
  *
@@ -357,16 +406,6 @@ passim_item_set_ctime(PassimItem *self, GDateTime *ctime)
 		priv->ctime = g_date_time_ref(ctime);
 }
 
-static gchar *
-passim_compute_checksum_for_filename(const gchar *filename, GError **error)
-{
-	gsize bufsz = 0;
-	g_autofree gchar *buf = NULL;
-	if (!g_file_get_contents(filename, &buf, &bufsz, error))
-		return NULL;
-	return g_compute_checksum_for_data(G_CHECKSUM_SHA256, (const guchar *)buf, bufsz);
-}
-
 #if !GLIB_CHECK_VERSION(2, 70, 0)
 static GDateTime *
 g_file_info_get_creation_date_time(GFileInfo *info)
@@ -391,15 +430,20 @@ passim_item_load_filename(PassimItem *self, const gchar *filename, GError **erro
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_autoptr(GFile) file = NULL;
+	g_autoptr(GBytes) bytes = NULL;
 	g_autoptr(GFileInfo) info = NULL;
 
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), FALSE);
 	g_return_val_if_fail(filename != NULL, FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
-	/* set file */
+	/* set file and bytes (which also sets the hash too) */
 	file = g_file_new_for_path(filename);
 	passim_item_set_file(self, file);
+	bytes = g_file_load_bytes(file, NULL, NULL, error);
+	if (bytes == NULL)
+		return FALSE;
+	passim_item_set_bytes(self, bytes);
 
 	/* get ctime */
 	info = g_file_query_info(file,
@@ -414,11 +458,6 @@ passim_item_load_filename(PassimItem *self, const gchar *filename, GError **erro
 	/* if not already set */
 	if (priv->basename == NULL)
 		priv->basename = g_path_get_basename(filename);
-	if (priv->hash == NULL) {
-		priv->hash = passim_compute_checksum_for_filename(filename, error);
-		if (priv->hash == NULL)
-			return FALSE;
-	}
 
 	/* success */
 	return TRUE;
@@ -716,6 +755,8 @@ passim_item_finalize(GObject *object)
 
 	if (priv->file != NULL)
 		g_object_unref(priv->file);
+	if (priv->bytes != NULL)
+		g_bytes_unref(priv->bytes);
 	if (priv->ctime != NULL)
 		g_date_time_unref(priv->ctime);
 	g_free(priv->hash);

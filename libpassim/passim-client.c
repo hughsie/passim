@@ -6,7 +6,16 @@
 
 #include "config.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <gio/gunixfdlist.h>
+#include <gio/gunixinputstream.h>
+#include <glib/gstdio.h>
+#include <unistd.h>
+
+#ifdef HAVE_MEMFD_CREATE
+#include <sys/mman.h>
+#endif
 
 #include "passim-client.h"
 
@@ -159,6 +168,74 @@ passim_client_unpublish(PassimClient *self, const gchar *hash, GError **error)
 	return val != NULL;
 }
 
+static GUnixInputStream *
+passim_client_input_stream_from_bytes(GBytes *bytes, GError **error)
+{
+	gint fd;
+	gssize rc;
+#ifndef HAVE_MEMFD_CREATE
+	gchar tmp_file[] = "/tmp/passim.XXXXXX";
+#endif
+
+#ifdef HAVE_MEMFD_CREATE
+	fd = memfd_create("fwupd", MFD_CLOEXEC);
+#else
+	/* emulate in-memory file by an unlinked temporary file */
+	fd = g_mkstemp(tmp_file);
+	if (fd != -1) {
+		rc = g_unlink(tmp_file);
+		if (rc != 0) {
+			if (!g_close(fd, error)) {
+				g_prefix_error(error, "failed to close temporary file: ");
+				return NULL;
+			}
+			g_set_error_literal(error,
+					    G_IO_ERROR,
+					    G_IO_ERROR_INVALID_DATA,
+					    "failed to unlink temporary file");
+			return NULL;
+		}
+	}
+#endif
+
+	if (fd < 0) {
+		g_set_error_literal(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_DATA,
+				    "failed to create memfd");
+		return NULL;
+	}
+	rc = write(fd, g_bytes_get_data(bytes, NULL), g_bytes_get_size(bytes));
+	if (rc < 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_DATA,
+			    "failed to write %" G_GSSIZE_FORMAT,
+			    rc);
+		return NULL;
+	}
+	if (lseek(fd, 0, SEEK_SET) < 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_DATA,
+			    "failed to seek: %s",
+			    g_strerror(errno));
+		return NULL;
+	}
+	return G_UNIX_INPUT_STREAM(g_unix_input_stream_new(fd, TRUE));
+}
+
+static GUnixInputStream *
+passim_client_input_stream_from_filename(const gchar *fn, GError **error)
+{
+	gint fd = open(fn, O_RDONLY);
+	if (fd < 0) {
+		g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA, "failed to open %s", fn);
+		return NULL;
+	}
+	return G_UNIX_INPUT_STREAM(g_unix_input_stream_new(fd, TRUE));
+}
+
 /**
  * passim_client_publish:
  * @self: a #PassimClient
@@ -175,11 +252,10 @@ gboolean
 passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 {
 	PassimClientPrivate *priv = GET_PRIVATE(self);
-	g_autofree gchar *filename = NULL;
 	g_autoptr(GDBusMessage) reply = NULL;
 	g_autoptr(GDBusMessage) request = NULL;
-	g_autoptr(GIOChannel) io = NULL;
 	g_autoptr(GUnixFDList) fd_list = g_unix_fd_list_new();
+	g_autoptr(GUnixInputStream) istream = NULL;
 
 	g_return_val_if_fail(PASSIM_IS_CLIENT(self), FALSE);
 	g_return_val_if_fail(PASSIM_IS_ITEM(item), FALSE);
@@ -187,11 +263,23 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
 	/* set out of band file descriptor */
-	filename = g_file_get_path(passim_item_get_file(item));
-	io = g_io_channel_new_file(filename, "r", error);
-	if (io == NULL)
+	if (passim_item_get_file(item) != NULL) {
+		g_autofree gchar *filename = g_file_get_path(passim_item_get_file(item));
+		istream = passim_client_input_stream_from_filename(filename, error);
+		if (istream == NULL)
+			return FALSE;
+	} else if (passim_item_get_bytes(item) != NULL) {
+		istream = passim_client_input_stream_from_bytes(passim_item_get_bytes(item), error);
+		if (istream == NULL)
+			return FALSE;
+	} else {
+		g_set_error_literal(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_DATA,
+				    "no PassimItem bytes or file set");
 		return FALSE;
-	g_unix_fd_list_append(fd_list, g_io_channel_unix_get_fd(io), NULL);
+	}
+	g_unix_fd_list_append(fd_list, g_unix_input_stream_get_fd(istream), NULL);
 	request = g_dbus_message_new_method_call(g_dbus_proxy_get_name(priv->proxy),
 						 g_dbus_proxy_get_object_path(priv->proxy),
 						 g_dbus_proxy_get_interface_name(priv->proxy),
@@ -201,7 +289,7 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 	/* call into daemon */
 	g_dbus_message_set_body(request,
 				g_variant_new("(hstuu)",
-					      g_io_channel_unix_get_fd(io),
+					      g_unix_input_stream_get_fd(istream),
 					      passim_item_get_basename(item),
 					      passim_item_get_flags(item),
 					      passim_item_get_max_age(item),

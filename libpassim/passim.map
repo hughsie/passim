@@ -15,6 +15,7 @@ LIBPASSIM_0.1.0 {
     passim_item_from_variant;
     passim_item_get_age;
     passim_item_get_basename;
+    passim_item_get_bytes;
     passim_item_get_cmdline;
     passim_item_get_ctime;
     passim_item_get_file;
@@ -30,6 +31,7 @@ LIBPASSIM_0.1.0 {
     passim_item_new;
     passim_item_remove_flag;
     passim_item_set_basename;
+    passim_item_set_bytes;
     passim_item_set_cmdline;
     passim_item_set_ctime;
     passim_item_set_file;
