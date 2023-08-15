@@ -118,6 +118,8 @@ conf.set_quoted('SOURCE_VERSION', source_version)
 root_incdir = include_directories('.')
 
 libgio = dependency('gio-unix-2.0', version: '>= 2.68.0')
+libsoup = dependency('libsoup-3.0', version: '>= 3.4.0')
+libgnutls = dependency('gnutls', version: '>= 3.6.0')
 
 if cc.has_function('memfd_create')
   conf.set('HAVE_MEMFD_CREATE', '1')

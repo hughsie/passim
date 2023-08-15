@@ -64,9 +64,6 @@ passim_common_func(void)
 	boot_time = passim_get_boot_time();
 	g_assert_cmpstr(boot_time, !=, NULL);
 
-	/* check HTTP status codes */
-	g_assert_cmpstr(passim_http_code_to_string(404), ==, "Not Found");
-
 	/* create dir for next step */
 	xargs_fn = g_test_build_filename(G_TEST_BUILT, "tests", "test.conf", NULL);
 	xargs_path = g_path_get_dirname(xargs_fn);

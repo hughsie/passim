@@ -27,10 +27,9 @@ stores them in `/var/lib/passim/data` with attributes set on each file for the `
 than the max age it is deleted and not advertised to other clients.
 
 The daemon then advertises the availability of the file as a mDNS service subtype and provides a
-tiny single-threaded HTTP v1.0 server that supplies the file over HTTP. Note, I said HTTP there --
-not HTTPS -- i.e. so there's no SSL or encryption involved at all. Remember that.
+tiny single-threaded webserver that supplies the file using HTTP using a self-signed TLS certificate.
 
-The file is sent when requested from a URL like `http://192.168.1.1:27500/filename.xml.gz?sha256=hash`
+The file is sent when requested from a URL like `https://192.168.1.1:27500/filename.xml.gz?sha256=hash`
 -- any file requested without the checksum will not be supplied. Although this is a chicken-and-egg
 problem where you don't know the payload checksum until you've checked the remote server, this is
 easy solved using a tiny <100 byte request to the CDN for the payload checksum (or a .jcat file)
@@ -47,13 +46,13 @@ metadata from other peers. If Avahi is not running, or mDNS is turned off on the
 no files will be shared.
 
 The cached index is available locally without any kind of authentication -- both over mDNS and
-as a HTTP page on `http://localhost:27500/`.
+as a webpage on `https://localhost:27500/`.
 
 So, **NEVER ADD FILES TO THE CACHE THAT YOU DO NOT WANT TO SHARE**. Even the filename may give more
-clues than you wanted to provide, e.g. sharing `madison.json` might get you in trouble with a family
-member. This can be more subtle; if you download a security update for a Lenovo P1 Gen 3 laptop
-and share it with other laptops on your LAN -- it also tells the attacker your laptop model and also
-that you're running a system firmware that isn't patched against the latest firmware bug.
+clues than you wanted to provide, e.g. sharing a file might get you in trouble.
+This can be subtle; if you download a security update for a Lenovo P1 Gen 3 laptop and share it with
+other laptops on your LAN -- it also tells the attacker your laptop model and also that you're
+running a system firmware that isn't patched against the latest firmware bug.
 
 My recommendation here is only to advertise files that are common to all machines. For instance:
 
@@ -101,34 +100,72 @@ point of view Passim would be compliant (as it only shares locally) and IPFS wou
 
 ## Debugging
 
-    $ curl -v http://localhost:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 -L
+    $ curl -v -k https://localhost:27500/HELLO.md?sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447 -L
     *   Trying 127.0.0.1:27500...
     * Connected to localhost (127.0.0.1) port 27500 (#0)
-    > GET /HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 HTTP/1.1
+    * ALPN: offers h2,http/1.1
+    * TLSv1.3 (OUT), TLS handshake, Client hello (1):
+    * TLSv1.3 (IN), TLS handshake, Server hello (2):
+    * TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+    * TLSv1.3 (IN), TLS handshake, Certificate (11):
+    * TLSv1.3 (IN), TLS handshake, CERT verify (15):
+    * TLSv1.3 (IN), TLS handshake, Finished (20):
+    * TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+    * TLSv1.3 (OUT), TLS handshake, Finished (20):
+    * SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+    * ALPN: server accepted http/1.1
+    * Server certificate:
+    *  subject: [NONE]
+    *  start date: Aug 15 20:13:03 2023 GMT
+    *  expire date: Dec 31 23:59:59 9999 GMT
+    * using HTTP/1.1
+    > GET /HELLO.md?sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447 HTTP/1.1
     > Host: localhost:27500
     > User-Agent: curl/8.0.1
     > Accept: */*
     >
-    * HTTP 1.0, assume close after body
-    < HTTP/1.0 303 See Other
-    < Content-Length: 136
-    < Location: http://192.168.122.39:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511
+    < HTTP/1.1 302 Found
+    < Server: passim libsoup/3.4.2
+    < Date: Tue, 15 Aug 2023 20:37:10 GMT
+    < Location: https://192.168.122.39:27500/sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447?sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447
+    < Content-Type: text/html
+    < Content-Length: 227
     <
-    * Closing connection 0
-    * Issue another request to this URL: 'http://192.168.122.39:27500/HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511'
+    * Ignoring the response-body
+    * Connection #0 to host localhost left intact
+    * Issue another request to this URL: 'https://192.168.122.39:27500/sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447?sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447'
     *   Trying 192.168.122.39:27500...
     * Connected to 192.168.122.39 (192.168.122.39) port 27500 (#1)
-    > GET /HELLO.md?sha256=22596363b3de40b06f981fb85d82312e8c0ed511 HTTP/1.0
+    * ALPN: offers h2,http/1.1
+    * TLSv1.3 (OUT), TLS handshake, Client hello (1):
+    * TLSv1.3 (IN), TLS handshake, Server hello (2):
+    * TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+    * TLSv1.3 (IN), TLS handshake, Certificate (11):
+    * TLSv1.3 (IN), TLS handshake, CERT verify (15):
+    * TLSv1.3 (IN), TLS handshake, Finished (20):
+    * TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+    * TLSv1.3 (OUT), TLS handshake, Finished (20):
+    * SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+    * ALPN: server accepted http/1.1
+    * Server certificate:
+    *  subject: [NONE]
+    *  start date: Aug 15 20:27:28 2023 GMT
+    *  expire date: Dec 31 23:59:59 9999 GMT
+    * using HTTP/1.1
+    > GET /sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447?sha256=a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447 HTTP/1.1
     > Host: 192.168.122.39:27500
     > User-Agent: curl/8.0.1
     > Accept: */*
     >
-    * HTTP 1.0, assume close after body
-    < HTTP/1.0 200 OK
+    < HTTP/1.1 200 OK
+    < Server: passim libsoup/3.4.2
+    < Date: Tue, 15 Aug 2023 20:37:11 GMT
+    < Content-Disposition: attachment; filename="a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447-HELLO.md"
+    < Content-Type: text/markdown
     < Content-Length: 12
     <
     hello world
-    * Closing connection 1
+    * Connection #1 to host 192.168.122.39 left intact
 
 Using the CLI:
 
