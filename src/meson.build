@@ -13,6 +13,7 @@ executable(
     'passim-avahi-service.c',
     'passim-avahi-service-resolver.c',
     'passim-common.c',
+    'passim-gnutls.c',
     'passim-server.c',
   ],
   include_directories: [
@@ -21,6 +22,8 @@ executable(
   ],
   dependencies: [
     libgio,
+    libsoup,
+    libgnutls,
   ],
   link_with: [
     passim,

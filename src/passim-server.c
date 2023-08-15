@@ -8,10 +8,12 @@
 
 #include <gio/gunixfdlist.h>
 #include <gio/gunixinputstream.h>
+#include <libsoup/soup.h>
 #include <passim.h>
 
 #include "passim-avahi.h"
 #include "passim-common.h"
+#include "passim-gnutls.h"
 
 typedef struct {
 	GDBusConnection *connection;
@@ -148,7 +150,7 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 		}
 	}
 
-	g_debug("added http://localhost:%u/%s?sha256=%s",
+	g_debug("added https://localhost:%u/%s?sha256=%s",
 		self->port,
 		passim_item_get_basename(item),
 		passim_item_get_hash(item));
@@ -183,17 +185,16 @@ passim_server_libdir_scan(PassimServer *self, GError **error)
 
 typedef struct {
 	PassimServer *self;
-	GSocketConnection *connection;
+	SoupServerMessage *msg;
 	gchar *hash;
 	gchar *basename;
-	gboolean addr_loopback;
 } PassimServerContext;
 
 static void
 passim_server_context_free(PassimServerContext *ctx)
 {
-	if (ctx->connection != NULL)
-		g_object_unref(ctx->connection);
+	if (ctx->msg != NULL)
+		g_object_unref(ctx->msg);
 	g_free(ctx->hash);
 	g_free(ctx->basename);
 	g_free(ctx);
@@ -202,65 +203,47 @@ passim_server_context_free(PassimServerContext *ctx)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(PassimServerContext, passim_server_context_free)
 
 static void
-passim_server_context_send(PassimServerContext *ctx,
-			   guint error_code,
-			   GPtrArray *headers,
-			   const gchar *html)
+passim_server_msg_send_error(PassimServer *self,
+			     SoupServerMessage *msg,
+			     guint status_code,
+			     const gchar *reason)
 {
-	GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(ctx->connection));
-	const gchar *http_reason = passim_http_code_to_string(error_code);
-	g_autoptr(GError) error = NULL;
-	g_autoptr(GString) str = g_string_new(NULL);
-
-	g_string_append_printf(str, "HTTP/1.0 %u %s\r\n", error_code, http_reason);
-	if (html != NULL) {
-		g_string_append_printf(str,
-				       "Content-Length: %" G_GSIZE_FORMAT "\r\n",
-				       strlen(html) + 2);
-	}
-	if (headers != NULL) {
-		for (guint i = 0; i < headers->len; i++) {
-			const gchar *header = g_ptr_array_index(headers, i);
-			g_string_append_printf(str, "%s\r\n", header);
-		}
-	}
-	g_string_append(str, "\r\n");
-	if (html != NULL)
-		g_string_append_printf(str, "%s\r\n", html);
-	g_output_stream_write_all(out, str->str, str->len, NULL, NULL, NULL);
-	if (!g_io_stream_close(G_IO_STREAM(ctx->connection), NULL, &error))
-		g_warning("failed to close connection: %s", error->message);
-}
-
-static void
-passim_server_context_send_error(PassimServerContext *ctx, guint error_code, const gchar *reason)
-{
-	g_autofree gchar *html = NULL;
-	const gchar *reason_fallback = reason ? reason : passim_http_code_to_string(error_code);
-	html = g_strdup_printf("<html><head><title>%u %s</title></head>"
+	g_autoptr(GString) html = g_string_new(NULL);
+	const gchar *reason_fallback = reason ? reason : soup_status_get_phrase(status_code);
+	g_string_append_printf(html,
+			       "<html><head><title>%u %s</title></head>"
 			       "<body>%s</body></html>",
-			       error_code,
-			       passim_http_code_to_string(error_code),
+			       status_code,
+			       soup_status_get_phrase(status_code),
 			       reason_fallback);
-	passim_server_context_send(ctx, error_code, NULL, html);
+	soup_server_message_set_status(msg, status_code, NULL);
+	soup_server_message_set_response(msg, "text/html", SOUP_MEMORY_COPY, html->str, html->len);
+	soup_server_message_unpause(msg);
 }
 
 static void
 passim_server_context_send_redirect(PassimServerContext *ctx, const gchar *location)
 {
-	g_autoptr(GPtrArray) headers = g_ptr_array_new_with_free_func(g_free);
+	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(ctx->msg);
+	g_autoptr(GString) html = g_string_new(NULL);
 	g_autofree gchar *uri =
-	    g_strdup_printf("http://%s/%s?sha256=%s", location, ctx->basename, ctx->hash);
-	g_autofree gchar *html =
-	    g_strdup_printf("<html><body><a href=\"%s\">Redirecting</a>...</body></html>", uri);
-	g_ptr_array_add(headers, g_strdup_printf("Location: %s", uri));
-	passim_server_context_send(ctx, 303, headers, html);
+	    g_strdup_printf("https://%s/%s?sha256=%s", location, ctx->basename, ctx->hash);
+	g_string_append_printf(html,
+			       "<html><body><a href=\"%s\">Redirecting</a>...</body></html>",
+			       uri);
+	soup_message_headers_append(hdrs, "Location", uri);
+	soup_server_message_set_status(ctx->msg, SOUP_STATUS_MOVED_TEMPORARILY, NULL);
+	soup_server_message_set_response(ctx->msg,
+					 "text/html",
+					 SOUP_MEMORY_COPY,
+					 html->str,
+					 html->len);
+	soup_server_message_unpause(ctx->msg);
 }
 
 static void
-passim_server_send_index(PassimServerContext *ctx)
+passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 {
-	PassimServer *self = ctx->self;
 	g_autoptr(GString) html = g_string_new(NULL);
 	g_autoptr(GList) keys = g_hash_table_get_keys(self->items);
 
@@ -296,7 +279,7 @@ passim_server_send_index(PassimServerContext *ctx)
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
 			g_autofree gchar *flags = passim_item_get_flags_as_string(item);
-			g_autofree gchar *url = g_strdup_printf("http://localhost:%u/%s?sha256=%s",
+			g_autofree gchar *url = g_strdup_printf("https://localhost:%u/%s?sha256=%s",
 								self->port,
 								passim_item_get_basename(item),
 								hash);
@@ -326,54 +309,51 @@ passim_server_send_index(PassimServerContext *ctx)
 	}
 	g_string_append(html, "</body>\n");
 	g_string_append(html, "</html>\n");
-	passim_server_context_send(ctx, 200, NULL, html->str);
+	soup_server_message_set_status(msg, SOUP_STATUS_OK, NULL);
+	soup_server_message_set_response(msg, "text/html", SOUP_MEMORY_COPY, html->str, html->len);
 }
 
 static void
-passim_server_context_send_file(PassimServerContext *ctx, GFile *file, GPtrArray *headers)
+passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gchar *path)
 {
-	GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(ctx->connection));
+	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(msg);
+	GMappedFile *mapping;
+	g_autoptr(GBytes) bytes = NULL;
 	g_autoptr(GError) error = NULL;
+	g_autoptr(GFile) file = g_file_new_for_path(path);
 	g_autoptr(GFileInfo) info = NULL;
-	g_autoptr(GFileInputStream) file_in = NULL;
-	g_autoptr(GString) str = NULL;
 
-	file_in = g_file_read(file, NULL, &error);
-	if (file_in == NULL) {
-		passim_server_context_send_error(ctx, 404, error->message);
+	mapping = g_mapped_file_new(path, FALSE, &error);
+	if (mapping == NULL) {
+		soup_server_message_set_status(msg,
+					       SOUP_STATUS_INTERNAL_SERVER_ERROR,
+					       error->message);
 		return;
 	}
+	bytes = g_bytes_new_with_free_func(g_mapped_file_get_contents(mapping),
+					   g_mapped_file_get_length(mapping),
+					   (GDestroyNotify)g_mapped_file_unref,
+					   mapping);
+	soup_message_body_append_bytes(soup_server_message_get_response_body(msg), bytes);
+	soup_server_message_set_status(msg, SOUP_STATUS_OK, NULL);
 
-	str = g_string_new("HTTP/1.0 200 OK\r\n");
-	info = g_file_input_stream_query_info(file_in,
-					      G_FILE_ATTRIBUTE_STANDARD_SIZE
-					      "," G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
-					      NULL,
-					      NULL);
-	if (headers != NULL) {
-		for (guint i = 0; i < headers->len; i++) {
-			const gchar *header = g_ptr_array_index(headers, i);
-			g_string_append_printf(str, "%s\r\n", header);
-		}
+	info = g_file_query_info(file,
+				 G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
+				 G_FILE_QUERY_INFO_NONE,
+				 NULL,
+				 &error);
+	if (info == NULL) {
+		soup_server_message_set_status(msg,
+					       SOUP_STATUS_INTERNAL_SERVER_ERROR,
+					       error->message);
+		return;
 	}
-	if (info != NULL) {
-		const gchar *content_type;
-		if (g_file_info_has_attribute(info, G_FILE_ATTRIBUTE_STANDARD_SIZE)) {
-			g_string_append_printf(str,
-					       "Content-Length: %" G_GINT64_FORMAT "\r\n",
-					       g_file_info_get_size(info));
-		}
-		content_type = g_file_info_get_content_type(info);
-		if (content_type != NULL) {
-			g_autofree gchar *mime_type = g_content_type_get_mime_type(content_type);
-			if (mime_type != NULL)
-				g_string_append_printf(str, "Content-Type: %s\r\n", mime_type);
-		}
+	if (g_file_info_get_content_type(info) != NULL) {
+		g_autofree gchar *mime_type =
+		    g_content_type_get_mime_type(g_file_info_get_content_type(info));
+		if (mime_type != NULL)
+			soup_message_headers_append(hdrs, "Content-Type", mime_type);
 	}
-	g_string_append(str, "\r\n");
-	if (g_output_stream_write_all(out, str->str, str->len, NULL, NULL, NULL))
-		g_output_stream_splice(out, G_INPUT_STREAM(file_in), 0, NULL, NULL);
-	g_input_stream_close(G_INPUT_STREAM(file_in), NULL, NULL);
 }
 
 static gboolean
@@ -392,15 +372,17 @@ passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 }
 
 static void
-passim_server_context_send_item(PassimServerContext *ctx, PassimItem *item)
+passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimItem *item)
 {
-	PassimServer *self = ctx->self;
-	g_autoptr(GPtrArray) headers = g_ptr_array_new_with_free_func(g_free);
+	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(msg);
+	g_autofree gchar *content_disposition = NULL;
+	g_autofree gchar *path = g_file_get_path(passim_item_get_file(item));
 
-	g_ptr_array_add(headers,
-			g_strdup_printf("Content-Disposition: attachment; filename=\"%s\"",
-					passim_item_get_basename(item)));
-	passim_server_context_send_file(ctx, passim_item_get_file(item), headers);
+	content_disposition =
+	    g_strdup_printf("attachment; filename=\"%s\"", passim_item_get_basename(item));
+	soup_message_headers_append(hdrs, "Content-Disposition", content_disposition);
+
+	passim_server_msg_send_file(self, msg, path);
 	passim_item_set_share_count(item, passim_item_get_share_count(item) + 1);
 
 	/* we've shared this enough now */
@@ -422,7 +404,7 @@ passim_server_avahi_find_cb(GObject *source_object, GAsyncResult *res, gpointer 
 
 	addresses = passim_avahi_find_finish(PASSIM_AVAHI(source_object), res, &error);
 	if (addresses == NULL) {
-		passim_server_context_send_error(ctx, 404, error->message);
+		passim_server_msg_send_error(ctx->self, ctx->msg, 404, error->message);
 		return;
 	}
 
@@ -446,99 +428,73 @@ passim_server_is_loopback(const gchar *inet_addr)
 	return g_inet_address_get_is_loopback(address);
 }
 
-static gboolean
-passim_server_handler_cb(GSocketService *service,
-			 GSocketConnection *connection,
-			 GObject *source_object,
+static void
+passim_server_handler_cb(SoupServer *server,
+			 SoupServerMessage *msg,
+			 const gchar *path,
+			 GHashTable *query,
 			 gpointer user_data)
 {
 	PassimServer *self = (PassimServer *)user_data;
-	GInputStream *in = g_io_stream_get_input_stream(G_IO_STREAM(connection));
 	GInetAddress *inet_addr;
+	GSocketAddress *socket_addr;
 	PassimItem *item;
-	g_autofree gchar *line = NULL;
-	g_autofree gchar *unescaped = NULL;
-	g_autofree gchar *inet_addrstr = NULL;
+	GUri *uri = soup_server_message_get_uri(msg);
+	gboolean is_loopback;
 	g_autofree gchar *hash = NULL;
+	g_autofree gchar *inet_addrstr = NULL;
 	g_auto(GStrv) request = NULL;
-	g_auto(GStrv) sections = NULL;
-	g_autoptr(GDataInputStream) data = NULL;
-	g_autoptr(GError) error = NULL;
-	g_autoptr(GSocketAddress) socket_addr = NULL;
 	g_autoptr(PassimServerContext) ctx = g_new0(PassimServerContext, 1);
 
-	/* create context */
-	ctx->self = self;
-	ctx->connection = g_object_ref(connection);
+	/* only GET supported */
+	if (soup_server_message_get_method(msg) != SOUP_METHOD_GET) {
+		passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
+		return;
+	}
 
 	/* who is connecting */
-	socket_addr = g_socket_connection_get_remote_address(connection, &error);
+	socket_addr = soup_server_message_get_remote_address(msg);
 	if (socket_addr == NULL) {
-		passim_server_context_send_error(ctx,
-						 400,
-						 "failed to get client connection address");
-		return TRUE;
+		passim_server_msg_send_error(self,
+					     msg,
+					     SOUP_STATUS_BAD_REQUEST,
+					     "failed to get client connection address");
+		return;
 	}
 	inet_addr = g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(socket_addr));
 	inet_addrstr = g_inet_address_to_string(inet_addr);
-	ctx->addr_loopback = passim_server_is_loopback(inet_addrstr);
-	g_info("accepting connection from %s:%u (%s)",
+	is_loopback = passim_server_is_loopback(inet_addrstr);
+	g_info("accepting HTTP/1.%u %s %s %s from %s:%u (%s)",
+	       soup_server_message_get_http_version(msg),
+	       soup_server_message_get_method(msg),
+	       path,
+	       g_uri_get_query(uri) != NULL ? g_uri_get_query(uri) : "",
 	       inet_addrstr,
 	       g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(socket_addr)),
-	       ctx->addr_loopback ? "loopback" : "remote");
-
-	/* be tolerant of input */
-	data = g_data_input_stream_new(in);
-	g_data_input_stream_set_newline_type(data, G_DATA_STREAM_NEWLINE_TYPE_ANY);
-	line = g_data_input_stream_read_line(data, NULL, NULL, NULL);
-	if (line == NULL) {
-		passim_server_context_send_error(ctx, 400, NULL);
-		return TRUE;
-	}
-	sections = g_strsplit(line, " ", -1);
-	if (g_strv_length(sections) != 3) {
-		passim_server_context_send_error(ctx, 400, NULL);
-		return TRUE;
-	}
-	if (g_strcmp0(sections[0], "GET") != 0) {
-		passim_server_context_send_error(ctx, 501, NULL);
-		return TRUE;
-	}
-	if (!g_str_has_prefix(sections[1], "/")) {
-		passim_server_context_send_error(ctx, 400, NULL);
-		return TRUE;
-	}
-	if (!g_str_has_prefix(sections[2], "HTTP/1.")) {
-		passim_server_context_send_error(ctx, 505, NULL);
-		return TRUE;
-	}
-	unescaped = g_uri_unescape_string(sections[1], NULL);
-	g_info("handle URI: %s", unescaped);
+	       is_loopback ? "loopback" : "remote");
 
 	/* just return the index */
-	if (g_strcmp0(unescaped, "/") == 0) {
-		if (!ctx->addr_loopback) {
-			passim_server_context_send_error(ctx, 403, NULL);
-			return TRUE;
+	if (g_strcmp0(path, "/") == 0) {
+		if (!is_loopback) {
+			passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
+			return;
 		}
-		passim_server_send_index(ctx);
-		return TRUE;
+		passim_server_send_index(self, msg);
+		return;
 	}
-	if (g_strcmp0(unescaped, "/favicon.ico") == 0 || g_strcmp0(unescaped, "/style.css") == 0) {
-		g_autofree gchar *fn =
-		    g_build_filename(PACKAGE_DATADIR, PACKAGE_NAME, unescaped, NULL);
-		g_autoptr(GFile) file = g_file_new_for_path(fn);
-		if (!ctx->addr_loopback) {
-			passim_server_context_send_error(ctx, 403, NULL);
-			return TRUE;
+	if (g_strcmp0(path, "/favicon.ico") == 0 || g_strcmp0(path, "/style.css") == 0) {
+		g_autofree gchar *fn = g_build_filename(PACKAGE_DATADIR, PACKAGE_NAME, path, NULL);
+		if (!is_loopback) {
+			passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
+			return;
 		}
-		passim_server_context_send_file(ctx, file, NULL);
-		return TRUE;
+		passim_server_msg_send_file(self, msg, fn);
+		return;
 	}
 
 	/* find the request hash argument */
-	request = g_strsplit_set(unescaped + 1, "?&", -1);
-	for (guint i = 1; request[i] != NULL; i++) {
+	request = g_strsplit(g_uri_get_query(uri), "&", -1);
+	for (guint i = 0; request[i] != NULL; i++) {
 		g_auto(GStrv) kv = g_strsplit(request[i], "=", -1);
 		if (g_strv_length(kv) != 2)
 			continue;
@@ -548,41 +504,51 @@ passim_server_handler_cb(GSocketService *service,
 		}
 	}
 	if (hash == NULL) {
-		passim_server_context_send_error(ctx, 400, "sha256= argument required");
-		return TRUE;
+		passim_server_msg_send_error(self,
+					     msg,
+					     SOUP_STATUS_BAD_REQUEST,
+					     "sha256= argument required");
+		return;
 	}
 	if (!g_str_is_ascii(hash) || strlen(hash) != 64) {
-		passim_server_context_send_error(ctx, 505, "sha256 hash is malformed");
-		return TRUE;
+		passim_server_msg_send_error(self,
+					     msg,
+					     SOUP_STATUS_NOT_ACCEPTABLE,
+					     "sha256 hash is malformed");
+		return;
 	}
 
 	/* already exists locally */
 	item = g_hash_table_lookup(self->items, hash);
 	if (item != NULL) {
 		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED)) {
-			passim_server_context_send_error(ctx, 423, NULL);
-			return TRUE;
+			passim_server_msg_send_error(self, msg, SOUP_STATUS_LOCKED, NULL);
+			return;
 		}
-		passim_server_context_send_item(ctx, item);
-		return TRUE;
+		passim_server_msg_send_item(self, msg, item);
+		return;
 	}
 
 	/* only localhost is allowed to scan for hashes */
-	if (!ctx->addr_loopback) {
-		passim_server_context_send_error(ctx, 403, NULL);
-		return TRUE;
+	if (!is_loopback) {
+		passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
+		return;
 	}
+
+	/* create context */
+	ctx->self = self;
+	ctx->msg = g_object_ref(msg);
+	ctx->hash = g_strdup(hash);
+	ctx->basename = g_strdup(request[0]);
 
 	/* look for remote servers with this hash */
 	g_info("searching for %s", hash);
-	ctx->hash = g_strdup(hash);
-	ctx->basename = g_strdup(request[0]);
+	soup_server_message_pause(msg);
 	passim_avahi_find_async(self->avahi,
 				hash,
 				NULL,
 				passim_server_avahi_find_cb,
 				g_steal_pointer(&ctx));
-	return TRUE;
 }
 
 static gboolean
@@ -1028,6 +994,52 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 	return TRUE;
 }
 
+static GTlsCertificate *
+passim_server_load_tls_certificate(GError **error)
+{
+	g_autofree gchar *cert_fn = NULL;
+	g_autofree gchar *secret_fn = NULL;
+	g_autoptr(GBytes) secret_blob = NULL;
+
+	/* create secret key */
+	secret_fn =
+	    g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "secret.key", NULL);
+	if (!g_file_test(secret_fn, G_FILE_TEST_EXISTS)) {
+		secret_blob = passim_gnutls_create_private_key(error);
+		if (secret_blob == NULL)
+			return NULL;
+		if (!passim_mkdir_parent(secret_fn, error))
+			return NULL;
+		if (!passim_file_set_contents(secret_fn, secret_blob, error))
+			return NULL;
+	}
+
+	/* create TLS cert */
+	cert_fn = g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "cert.pem", NULL);
+	if (!g_file_test(cert_fn, G_FILE_TEST_EXISTS)) {
+		g_autoptr(GBytes) cert_blob = NULL;
+		g_auto(gnutls_privkey_t) privkey = NULL;
+
+		if (secret_blob == NULL) {
+			secret_blob = passim_file_get_contents(secret_fn, error);
+			if (secret_blob == NULL)
+				return NULL;
+		}
+		privkey = passim_gnutls_load_privkey_from_blob(secret_blob, error);
+		if (privkey == NULL)
+			return NULL;
+		cert_blob = passim_gnutls_create_certificate(privkey, error);
+		if (cert_blob == NULL)
+			return NULL;
+		if (!passim_file_set_contents(cert_fn, cert_blob, error))
+			return NULL;
+	}
+
+	/* load cert */
+	g_info("using secret key %s and certificate %s", secret_fn, cert_fn);
+	return g_tls_certificate_new_from_files(cert_fn, secret_fn, error);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1035,8 +1047,10 @@ main(int argc, char *argv[])
 	gboolean timed_exit = FALSE;
 	g_autoptr(GError) error = NULL;
 	g_autoptr(GOptionContext) context = g_option_context_new(NULL);
-	g_autoptr(GSocketService) service = g_socket_service_new();
+	g_autoptr(GTlsCertificate) cert = NULL;
 	g_autoptr(PassimServer) self = g_new0(PassimServer, 1);
+	g_autoptr(SoupServer) soup_server = NULL;
+	g_autoslist(GUri) uris = NULL;
 	const GOptionEntry options[] = {
 	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
 	    {"timed-exit", '\0', 0, G_OPTION_ARG_NONE, &timed_exit, "Exit after a delay", NULL},
@@ -1087,15 +1101,22 @@ main(int argc, char *argv[])
 	passim_server_check_item_age(self);
 
 	/* set up the webserver */
-	if (!g_socket_listener_add_inet_port(G_SOCKET_LISTENER(service),
-					     self->port,
-					     NULL,
-					     &error)) {
+	cert = passim_server_load_tls_certificate(&error);
+	if (cert == NULL) {
+		g_warning("failed to load TLS cert: %s", error->message);
+		return 1;
+	}
+	soup_server = soup_server_new("server-header", "passim ", "tls-certificate", cert, NULL);
+	if (!soup_server_listen_all(soup_server, self->port, SOUP_SERVER_LISTEN_HTTPS, &error)) {
 		g_printerr("%s: %s\n", argv[0], error->message);
 		return 1;
 	}
-	g_info("HTTP server listening on port %d", self->port);
-	g_signal_connect(service, "incoming", G_CALLBACK(passim_server_handler_cb), self);
+	soup_server_add_handler(soup_server, NULL, passim_server_handler_cb, self, NULL);
+	uris = soup_server_get_uris(soup_server);
+	for (GSList *u = uris; u; u = u->next) {
+		g_autofree gchar *str = g_uri_to_string(u->data);
+		g_info("listening on %s", str);
+	}
 	self->http_active = TRUE;
 
 	/* register objects with Avahi */

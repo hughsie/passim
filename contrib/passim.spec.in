@@ -19,6 +19,8 @@ BuildRequires: meson
 BuildRequires: gcc
 BuildRequires: git-core
 BuildRequires: gobject-introspection-devel
+BuildRequires: gnutls-devel
+BuildRequires: libsoup3-devel
 
 Requires(post): systemd
 Requires(preun): systemd

@@ -175,36 +175,6 @@ passim_xattr_get_uint32(const gchar *filename,
 	return value;
 }
 
-const gchar *
-passim_http_code_to_string(guint error_code)
-{
-	if (error_code == 200)
-		return "OK";
-	if (error_code == 303)
-		return "See Other";
-	if (error_code == 400)
-		return "Bad Request";
-	if (error_code == 403)
-		return "Forbidden";
-	if (error_code == 404)
-		return "Not Found";
-	if (error_code == 423)
-		return "Locked";
-	if (error_code == 429)
-		return "Too Many Requests";
-	if (error_code == 501)
-		return "Not Implemented";
-	if (error_code == 503)
-		return "Service Unavailable";
-	if (error_code == 505)
-		return "HTTP Version Not Supported";
-	if (error_code == 507)
-		return "Insufficient Storage";
-	if (error_code == 508)
-		return "Loop Detected";
-	return "Unknown";
-}
-
 gboolean
 passim_mkdir(const gchar *dirname, GError **error)
 {
@@ -213,7 +183,7 @@ passim_mkdir(const gchar *dirname, GError **error)
 
 	if (!g_file_test(dirname, G_FILE_TEST_IS_DIR))
 		g_debug("creating path %s", dirname);
-	if (g_mkdir_with_parents(dirname, 0755) == -1) {
+	if (g_mkdir_with_parents(dirname, 0700) == -1) {
 		g_set_error(error,
 			    G_IO_ERROR,
 			    g_io_error_from_errno(errno),
@@ -223,6 +193,18 @@ passim_mkdir(const gchar *dirname, GError **error)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+gboolean
+passim_mkdir_parent(const gchar *filename, GError **error)
+{
+	g_autofree gchar *parent = NULL;
+
+	g_return_val_if_fail(filename != NULL, FALSE);
+	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+
+	parent = g_path_get_dirname(filename);
+	return passim_mkdir(parent, error);
 }
 
 GBytes *
@@ -284,4 +266,29 @@ passim_get_boot_time(void)
 			return g_strdup(lines[i] + 6);
 	}
 	return NULL;
+}
+
+gboolean
+passim_file_set_contents(const gchar *filename, GBytes *bytes, GError **error)
+{
+	gsize size = 0;
+	const gchar *data = g_bytes_get_data(bytes, &size);
+	g_debug("writing %s with %" G_GSIZE_FORMAT " bytes", filename, size);
+	return g_file_set_contents_full(filename,
+					data,
+					size,
+					G_FILE_SET_CONTENTS_CONSISTENT,
+					0600,
+					error);
+}
+
+GBytes *
+passim_file_get_contents(const gchar *filename, GError **error)
+{
+	gchar *data = NULL;
+	gsize len = 0;
+	if (!g_file_get_contents(filename, &data, &len, error))
+		return NULL;
+	g_debug("reading %s with %" G_GSIZE_FORMAT " bytes", filename, len);
+	return g_bytes_new_take(data, len);
 }
