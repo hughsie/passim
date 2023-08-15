@@ -212,8 +212,6 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 static gboolean
 passim_cli_unpublish(PassimCli *self, gchar **values, GError **error)
 {
-	g_autofree gchar *str = NULL;
-
 	/* parse args */
 	if (g_strv_length(values) != 1) {
 		g_set_error_literal(error,
