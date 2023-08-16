@@ -2,12 +2,12 @@ Passim Release Notes
 
 Write release entries:
 
-git log --format="%s" --cherry-pick --right-only 0.0.1... | grep -i -v trivial | grep -v Merge | sort | uniq
+git log --format="%s" --cherry-pick --right-only 0.1.0... | grep -i -v trivial | grep -v Merge | sort | uniq
 Add any user visible changes into ../data/org.freedesktop.Passim.metainfo.xml
 appstream-util appdata-to-news ../data/org.freedesktop.Passim.metainfo.xml > NEWS
 
 # MAKE SURE THIS IS CORRECT
-export release_ver="0.1.0"
+export release_ver="0.1.1"
 
 git commit -a -m "Release ${release_ver}" --no-verify
 git tag -s -f -m "Release ${release_ver}" "${release_ver}"
@@ -16,7 +16,7 @@ git push
 ninja dist
 gpg -b -a meson-dist/passim-${release_ver}.tar.xz
 
-Create release and upload tarball to https://github.com/passim/passim/tags
+Create release and upload tarball to https://github.com/hughsie/passim/tags
 
 Do post release version bump in meson.build
 
