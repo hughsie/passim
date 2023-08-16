@@ -8,6 +8,7 @@
 
 #include <gio/gunixfdlist.h>
 #include <gio/gunixinputstream.h>
+#include <glib-unix.h>
 #include <libsoup/soup.h>
 #include <passim.h>
 
@@ -1028,6 +1029,15 @@ passim_server_load_tls_certificate(GError **error)
 	return g_tls_certificate_new_from_files(cert_fn, secret_fn, error);
 }
 
+static gboolean
+passim_server_sigint_cb(gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	g_debug("Handling SIGINT");
+	g_main_loop_quit(self->loop);
+	return FALSE;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1035,6 +1045,7 @@ main(int argc, char *argv[])
 	gboolean timed_exit = FALSE;
 	g_autoptr(GError) error = NULL;
 	g_autoptr(GOptionContext) context = g_option_context_new(NULL);
+	g_autoptr(GSource) unix_signal_source = g_unix_signal_source_new(SIGINT);
 	g_autoptr(GTlsCertificate) cert = NULL;
 	g_autoptr(PassimServer) self = g_new0(PassimServer, 1);
 	g_autoptr(SoupServer) soup_server = NULL;
@@ -1112,6 +1123,10 @@ main(int argc, char *argv[])
 		g_warning("failed to register: %s", error->message);
 		return 1;
 	}
+
+	/* do stuff on ctrl+c */
+	g_source_set_callback(unix_signal_source, passim_server_sigint_cb, self, NULL);
+	g_source_attach(unix_signal_source, NULL);
 
 	g_main_loop_run(self->loop);
 	return 0;
