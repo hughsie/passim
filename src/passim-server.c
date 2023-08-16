@@ -752,35 +752,23 @@ passim_server_method_call(GDBusConnection *connection,
 	if (g_strcmp0(method_name, "Publish") == 0) {
 		GDBusMessage *message;
 		GUnixFDList *fd_list;
-		const gchar *basename = NULL;
 		gint fd = 0;
-		guint32 max_age = 0;
-		guint32 share_limit = 0;
-		guint64 flags = 0;
 		g_autofree gchar *cmdline = NULL;
 		g_autoptr(GBytes) blob = NULL;
 		g_autoptr(GError) error = NULL;
 		g_autoptr(GInputStream) istream = NULL;
-		g_autoptr(PassimItem) item = passim_item_new();
+		g_autoptr(PassimItem) item = NULL;
+		g_autoptr(GVariant) variant = NULL;
 
-		g_variant_get(parameters,
-			      "(h&stuu)",
-			      &fd,
-			      &basename,
-			      &flags,
-			      &max_age,
-			      &share_limit);
+		g_variant_get(parameters, "(h@a{sv})", &fd, &variant);
+		item = passim_item_from_variant(variant);
 		g_debug("Called %s(%i, %s, 0x%x, %u, %u)",
 			method_name,
 			fd,
-			basename,
-			(guint)flags,
-			max_age,
-			share_limit);
-		passim_item_set_basename(item, basename);
-		passim_item_set_flags(item, flags);
-		passim_item_set_max_age(item, max_age);
-		passim_item_set_share_limit(item, share_limit);
+			passim_item_get_basename(item),
+			(guint)passim_item_get_flags(item),
+			passim_item_get_max_age(item),
+			passim_item_get_share_limit(item));
 
 		/* only callable by root */
 		if (!passim_server_sender_check_uid(self, sender, &error)) {
@@ -797,7 +785,7 @@ passim_server_method_call(GDBusConnection *connection,
 		passim_item_set_cmdline(item, cmdline);
 
 		/* sanity check this does not contain a path */
-		if (g_strstr_len(basename, -1, "/") != NULL) {
+		if (g_strstr_len(passim_item_get_basename(item), -1, "/") != NULL) {
 			g_dbus_method_invocation_return_error_literal(invocation,
 								      G_DBUS_ERROR,
 								      G_DBUS_ERROR_INVALID_ARGS,
