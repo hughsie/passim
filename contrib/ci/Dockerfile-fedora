@@ -1,0 +1,14 @@
+FROM fedora:38
+
+RUN dnf -y update
+RUN dnf -y install \
+	git-core \
+	gnutls-devel \
+	gobject-introspection-devel \
+	libsoup3-devel \
+	meson \
+	redhat-rpm-config \
+	shared-mime-info \
+	systemd
+
+WORKDIR /build

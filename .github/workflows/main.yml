@@ -1,0 +1,21 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro:
+          - fedora
+          - debian
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build -t passim-${{ matrix.distro }} -f contrib/ci/Dockerfile-${{ matrix.distro }} .
+      - run: docker run -t -v `pwd`:/build passim-${{ matrix.distro }} ./contrib/ci/build-${{ matrix.distro }}.sh
