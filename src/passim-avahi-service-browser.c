@@ -231,7 +231,7 @@ passim_avahi_service_browser_async(GDBusProxy *proxy,
 GPtrArray *
 passim_avahi_service_browser_finish(GAsyncResult *res, GError **error)
 {
-	g_return_val_if_fail(res != NULL, FALSE);
-	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+	g_return_val_if_fail(res != NULL, NULL);
+	g_return_val_if_fail(error == NULL || *error == NULL, NULL);
 	return g_task_propagate_pointer(G_TASK(res), error);
 }

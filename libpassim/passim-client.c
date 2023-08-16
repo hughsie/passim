@@ -131,7 +131,7 @@ passim_client_get_items(PassimClient *self, GError **error)
 				     NULL,
 				     error);
 	if (val == NULL)
-		return FALSE;
+		return NULL;
 	return passim_item_array_from_variant(val);
 }
 

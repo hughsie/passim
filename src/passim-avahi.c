@@ -349,9 +349,9 @@ passim_avahi_find_async(PassimAvahi *self,
 GPtrArray *
 passim_avahi_find_finish(PassimAvahi *self, GAsyncResult *res, GError **error)
 {
-	g_return_val_if_fail(PASSIM_IS_AVAHI(self), FALSE);
-	g_return_val_if_fail(g_task_is_valid(res, self), FALSE);
-	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+	g_return_val_if_fail(PASSIM_IS_AVAHI(self), NULL);
+	g_return_val_if_fail(g_task_is_valid(res, self), NULL);
+	g_return_val_if_fail(error == NULL || *error == NULL, NULL);
 	return g_task_propagate_pointer(G_TASK(res), error);
 }
 

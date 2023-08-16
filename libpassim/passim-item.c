@@ -596,7 +596,7 @@ passim_item_get_flags_as_string(PassimItem *self)
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_autoptr(GString) str = g_string_new(NULL);
 
-	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
 
 	for (guint i = 0; i < 64; i++) {
 		if ((priv->flags & ((guint64)1 << i)) == 0)
