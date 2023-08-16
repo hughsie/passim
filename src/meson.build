@@ -29,7 +29,7 @@ executable(
     passim,
   ],
   install: true,
-  install_dir: sbindir,
+  install_dir: libexecdir,
 )
 
 executable(

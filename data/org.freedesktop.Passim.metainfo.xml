@@ -13,10 +13,6 @@
   </description>
   <url type="bugtracker">https://github.com/hughsie/passim/issues</url>
   <url type="homepage">https://github.com/hughsie/passim</url>
-<!--
-  <url type="translate">https://www.transifex.com/freedesktop/passim/</url>
-  <translation type="gettext">passim</translation>
--->
   <content_rating type="oars-1.0">
     <content_attribute id="social-info">moderate</content_attribute>
   </content_rating>

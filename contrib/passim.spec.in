@@ -29,7 +29,7 @@ Requires(postun): systemd
 Requires: glib2%{?_isa} >= %{glib2_version}
 
 %description
-Passim is a daemon that allows other software to share metadata on your local network.
+Passim is a daemon that allows software to share files on your local network.
 
 %package devel
 Summary: Development package for %{name}
@@ -51,8 +51,6 @@ Files for development with %{name}.
 %meson_install
 rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 
-# %find_lang %{name}
-
 %post
 %systemd_post passim.service
 
@@ -63,17 +61,14 @@ rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 %systemd_postun_with_restart passim.service
 
 %files
-# -f %{name}.lang
 %doc README.md
 %license LICENSE
 %config(noreplace)%{_sysconfdir}/passim.conf
 %{_bindir}/passim
-%{_sbindir}/passimd
+%{_libexecdir}/passimd
 %{_datadir}/passim/*
 %{_datadir}/dbus-1/system.d/org.freedesktop.Passim.conf
 %{_datadir}/dbus-1/interfaces/org.freedesktop.Passim.xml
-# %{_datadir}/polkit-1/actions/org.freedesktop.Passim.policy
-# %{_datadir}/polkit-1/rules.d/org.freedesktop.Passim.rules
 %{_datadir}/dbus-1/system-services/org.freedesktop.Passim.service
 %{_mandir}/man1/*
 %{_datadir}/metainfo/org.freedesktop.Passim.metainfo.xml
