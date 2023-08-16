@@ -51,31 +51,10 @@
           </doc:summary>
         </doc:doc>
       </arg>
-      <arg type='s' name='filename' direction='in'>
+      <arg type='a{sv}' name='attrs' direction='in'>
         <doc:doc>
           <doc:summary>
-            <doc:para>The basename of the file to publish.</doc:para>
-          </doc:summary>
-        </doc:doc>
-      </arg>
-      <arg type='t' name='flags' direction='in'>
-        <doc:doc>
-          <doc:summary>
-            <doc:para>Flags affecting how the item is handled.</doc:para>
-          </doc:summary>
-        </doc:doc>
-      </arg>
-      <arg type='u' name='max_age' direction='in'>
-        <doc:doc>
-          <doc:summary>
-            <doc:para>The maximum age of the file in seconds.</doc:para>
-          </doc:summary>
-        </doc:doc>
-      </arg>
-      <arg type='u' name='share_limit' direction='in'>
-        <doc:doc>
-          <doc:summary>
-            <doc:para>The maximum number of times this file can be shared.</doc:para>
+            <doc:para>The attributes in a dictionary.</doc:para>
           </doc:summary>
         </doc:doc>
       </arg>

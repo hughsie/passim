@@ -482,19 +482,41 @@ passim_item_to_variant(PassimItem *self)
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
 
 	g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
-	g_variant_builder_add(&builder, "{sv}", "filename", g_variant_new_string(priv->basename));
-	g_variant_builder_add(&builder, "{sv}", "cmdline", g_variant_new_string(priv->cmdline));
-	g_variant_builder_add(&builder, "{sv}", "hash", g_variant_new_string(priv->hash));
-	g_variant_builder_add(&builder, "{sv}", "max-age", g_variant_new_uint32(priv->max_age));
-	g_variant_builder_add(&builder, "{sv}", "flags", g_variant_new_uint64(priv->flags));
-	g_variant_builder_add(&builder,
-			      "{sv}",
-			      "share-limit",
-			      g_variant_new_uint32(priv->share_limit));
-	g_variant_builder_add(&builder,
-			      "{sv}",
-			      "share-count",
-			      g_variant_new_uint32(priv->share_count));
+	if (priv->hash != NULL)
+		g_variant_builder_add(&builder, "{sv}", "hash", g_variant_new_string(priv->hash));
+	if (priv->basename != NULL) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "filename",
+				      g_variant_new_string(priv->basename));
+	}
+	if (priv->cmdline != NULL) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "cmdline",
+				      g_variant_new_string(priv->cmdline));
+	}
+	if (priv->max_age != 0) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "max-age",
+				      g_variant_new_uint32(priv->max_age));
+	}
+	if (priv->flags != PASSIM_ITEM_FLAG_NONE) {
+		g_variant_builder_add(&builder, "{sv}", "flags", g_variant_new_uint64(priv->flags));
+	}
+	if (priv->share_limit != 0) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "share-limit",
+				      g_variant_new_uint32(priv->share_limit));
+	}
+	if (priv->share_count != 0) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "share-count",
+				      g_variant_new_uint32(priv->share_count));
+	}
 	return g_variant_builder_end(&builder);
 }
 

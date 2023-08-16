@@ -288,12 +288,9 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 
 	/* call into daemon */
 	g_dbus_message_set_body(request,
-				g_variant_new("(hstuu)",
+				g_variant_new("(h@a{sv})",
 					      g_unix_input_stream_get_fd(istream),
-					      passim_item_get_basename(item),
-					      passim_item_get_flags(item),
-					      passim_item_get_max_age(item),
-					      passim_item_get_share_limit(item)));
+					      passim_item_to_variant(item)));
 	reply =
 	    g_dbus_connection_send_message_with_reply_sync(g_dbus_proxy_get_connection(priv->proxy),
 							   request,
