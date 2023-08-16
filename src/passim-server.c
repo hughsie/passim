@@ -141,8 +141,8 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 	passim_item_set_cmdline(item, cmdline);
 
 	/* only allowed when rebooted */
-	cmdline = passim_xattr_get_string(filename, "user.boot_time", NULL);
-	if (cmdline != NULL) {
+	boot_time = passim_xattr_get_string(filename, "user.boot_time", NULL);
+	if (boot_time != NULL) {
 		g_autofree gchar *boot_time_now = passim_get_boot_time();
 		if (g_strcmp0(boot_time_now, boot_time) == 0) {
 			passim_item_add_flag(item, PASSIM_ITEM_FLAG_NEXT_REBOOT);
