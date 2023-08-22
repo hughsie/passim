@@ -75,7 +75,7 @@ passim_common_func(void)
 	g_assert_true(ret);
 
 	/* check xargs */
-	g_unlink(xargs_fn);
+	(void)g_unlink(xargs_fn);
 	ret = g_file_set_contents(xargs_fn, "[daemon]", -1, &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);

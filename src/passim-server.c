@@ -1055,8 +1055,8 @@ main(int argc, char *argv[])
 	    {"timed-exit", '\0', 0, G_OPTION_ARG_NONE, &timed_exit, "Exit after a delay", NULL},
 	    {NULL}};
 
-	g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
-	g_setenv("G_DEBUG", "fatal-criticals", FALSE);
+	(void)g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
+	(void)g_setenv("G_DEBUG", "fatal-criticals", FALSE);
 
 	g_option_context_add_main_entries(context, options, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
