@@ -10,8 +10,8 @@ Name:      passim
 Version:   #VERSION#
 Release:   0.#BUILD#%{?alphatag}%{?dist}
 License:   LGPL-2.1-or-later
-URL:       https://github.com/hughsie/passim
-Source0:   http://people.freedesktop.org/~hughsient/releases/%{name}-%{version}.tar.xz
+URL:       https://github.com/hughsie/%{name}
+Source0:   https://github.com/hughsie/%{name}/releases/download/%{version}/%{name}-%{version}.tar.xz
 
 BuildRequires: glib2-devel >= %{glib2_version}
 BuildRequires: systemd >= %{systemd_version}
