@@ -794,6 +794,17 @@ passim_server_method_call(GDBusConnection *connection,
 			return;
 		}
 
+		/* sanity check share values */
+		if (passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
+			g_dbus_method_invocation_return_error(invocation,
+							      G_DBUS_ERROR,
+							      G_DBUS_ERROR_INVALID_ARGS,
+							      "share count %u >= share-limit %u",
+							      passim_item_get_share_count(item),
+							      passim_item_get_share_limit(item));
+			return;
+		}
+
 		/* read from the file descriptor */
 		message = g_dbus_method_invocation_get_message(invocation);
 		fd_list = g_dbus_message_get_unix_fd_list(message);
