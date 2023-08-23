@@ -652,8 +652,8 @@ passim_server_check_item_age(PassimServer *self)
 			g_debug("%s [%s] has age %uh, maximum is %uh",
 				passim_item_get_hash(item),
 				passim_item_get_basename(item),
-				(guint)age,
-				passim_item_get_max_age(item));
+				(guint)age / 3600u,
+				passim_item_get_max_age(item) / 3600u);
 		}
 	}
 }
