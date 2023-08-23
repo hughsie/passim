@@ -21,6 +21,7 @@ BuildRequires: git-core
 BuildRequires: gobject-introspection-devel
 BuildRequires: gnutls-devel
 BuildRequires: libsoup3-devel
+BuildRequires: libappstream-glib
 
 Requires(post): systemd
 Requires(preun): systemd
@@ -51,6 +52,9 @@ Files for development with %{name}.
 %meson_install
 rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 
+%check
+appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
+
 %post
 %systemd_post passim.service
 
@@ -66,6 +70,7 @@ rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 %config(noreplace)%{_sysconfdir}/passim.conf
 %{_bindir}/passim
 %{_libexecdir}/passimd
+%dir %{_datadir}/passim
 %{_datadir}/passim/*
 %{_datadir}/dbus-1/system.d/org.freedesktop.Passim.conf
 %{_datadir}/dbus-1/interfaces/org.freedesktop.Passim.xml
@@ -79,6 +84,7 @@ rm $RPM_BUILD_ROOT/var/lib/passim/data/*
 
 %files devel
 %{_datadir}/gir-1.0/Passim-1.0.gir
+%dir %{_includedir}/passim-1
 %{_includedir}/passim-1/passim*.h
 %{_libdir}/libpassim*.so
 %{_libdir}/pkgconfig/passim.pc
