@@ -771,6 +771,10 @@ passim_server_method_call(GDBusConnection *connection,
 			passim_item_get_max_age(item),
 			passim_item_get_share_limit(item));
 
+		/* only set by daemon */
+		if (passim_item_get_ctime(item) != NULL)
+			passim_item_set_ctime(item, NULL);
+
 		/* only callable by root */
 		if (!passim_server_sender_check_uid(self, sender, &error)) {
 			g_dbus_method_invocation_return_gerror(invocation, error);

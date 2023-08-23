@@ -517,6 +517,12 @@ passim_item_to_variant(PassimItem *self)
 				      "share-count",
 				      g_variant_new_uint32(priv->share_count));
 	}
+	if (priv->ctime != NULL) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "ctime",
+				      g_variant_new_int64(g_date_time_to_unix(priv->ctime)));
+	}
 	return g_variant_builder_end(&builder);
 }
 
@@ -557,6 +563,11 @@ passim_item_from_variant(GVariant *variant)
 			priv->share_count = g_variant_get_uint32(value);
 		if (g_strcmp0(key, "flags") == 0)
 			priv->flags = g_variant_get_uint64(value);
+		if (g_strcmp0(key, "ctime") == 0) {
+			g_autoptr(GDateTime) dt =
+			    g_date_time_new_from_unix_utc(g_variant_get_int64(value));
+			passim_item_set_ctime(self, dt);
+		}
 		g_variant_unref(value);
 	}
 	return g_steal_pointer(&self);
