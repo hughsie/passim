@@ -756,6 +756,7 @@ passim_server_method_call(GDBusConnection *connection,
 		gint fd = 0;
 		g_autofree gchar *cmdline = NULL;
 		g_autoptr(GBytes) blob = NULL;
+		g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
 		g_autoptr(GError) error = NULL;
 		g_autoptr(GInputStream) istream = NULL;
 		g_autoptr(PassimItem) item = NULL;
@@ -770,10 +771,6 @@ passim_server_method_call(GDBusConnection *connection,
 			(guint)passim_item_get_flags(item),
 			passim_item_get_max_age(item),
 			passim_item_get_share_limit(item));
-
-		/* only set by daemon */
-		if (passim_item_get_ctime(item) != NULL)
-			passim_item_set_ctime(item, NULL);
 
 		/* only callable by root */
 		if (!passim_server_sender_check_uid(self, sender, &error)) {
@@ -834,6 +831,9 @@ passim_server_method_call(GDBusConnection *connection,
 			g_dbus_method_invocation_return_gerror(invocation, error);
 			return;
 		}
+
+		/* only set by daemon */
+		passim_item_set_ctime(item, dt_now);
 
 		/* publish the new file */
 		if (!passim_server_publish_file(self, blob, item, &error)) {
