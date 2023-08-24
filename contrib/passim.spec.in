@@ -15,6 +15,7 @@ Source0:   https://github.com/hughsie/%{name}/releases/download/%{version}/%{nam
 
 BuildRequires: glib2-devel >= %{glib2_version}
 BuildRequires: systemd >= %{systemd_version}
+BuildRequires: systemd-rpm-macros
 BuildRequires: meson
 BuildRequires: gcc
 BuildRequires: git-core
@@ -22,10 +23,6 @@ BuildRequires: gobject-introspection-devel
 BuildRequires: gnutls-devel
 BuildRequires: libsoup3-devel
 BuildRequires: libappstream-glib
-
-Requires(post): systemd
-Requires(preun): systemd
-Requires(postun): systemd
 
 Requires: glib2%{?_isa} >= %{glib2_version}
 
@@ -71,11 +68,12 @@ appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
 %{_bindir}/passim
 %{_libexecdir}/passimd
 %dir %{_datadir}/passim
-%{_datadir}/passim/*
+%{_datadir}/passim/*.ico
+%{_datadir}/passim/*.css
 %{_datadir}/dbus-1/system.d/org.freedesktop.Passim.conf
 %{_datadir}/dbus-1/interfaces/org.freedesktop.Passim.xml
 %{_datadir}/dbus-1/system-services/org.freedesktop.Passim.service
-%{_mandir}/man1/*
+%{_mandir}/man1/passim.1*
 %{_datadir}/metainfo/org.freedesktop.Passim.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/org.freedesktop.Passim.png
 %{_unitdir}/passim.service
