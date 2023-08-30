@@ -67,6 +67,22 @@ supplied file and verify that it matches. There is no authentication or signing 
 so this step is non-optional. A malicious server could advertise the hash of `firmware.xml.gz` but
 actually supply `evil-payload.exe` -- and you do not want that.
 
+## Static Data
+
+Passim can also add the contents of static directories, and offer those to clients. This might be
+useful if you have a big directory of thousands of files (an LVFS mirror, for example) that you
+want to distribute from a dedicated machine.
+
+To set this up, create a keyfile with a unique name and extension `.conf`, something like
+`/etc/passim.d/lvfs.conf` with the contents:
+
+    [passim]
+    Path=/srv/lvfs/downloads/
+
+The running daemon will be notified this file has been created, scan the contents, and publish them
+for other users. If `passimd` has write permissions on the directory, it will also write an xattr
+of `user.checksum.sha256` which will speed up the next daemon restart considerably.
+
 ## Firewall Configuration
 
 Port 27500 should be open by default, but if downloading files fails you can open the port using
