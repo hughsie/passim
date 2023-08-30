@@ -759,17 +759,23 @@ gchar *
 passim_item_to_string(PassimItem *self)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
-	g_autofree gchar *flags = passim_item_get_flags_as_string(self);
+	GString *str;
+
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
-	return g_strdup_printf("%s %s (flags: %s, cmdline: %s, age: %u/%u, share: %u/%u)",
-			       priv->hash,
-			       priv->basename,
-			       flags,
-			       priv->cmdline,
-			       passim_item_get_age(self),
-			       priv->max_age,
-			       priv->share_count,
-			       priv->share_limit);
+
+	str = g_string_new(priv->hash);
+	g_string_append_printf(str, " %s", priv->basename);
+	if (priv->flags != PASSIM_ITEM_FLAG_NONE) {
+		g_autofree gchar *flags = passim_item_get_flags_as_string(self);
+		g_string_append_printf(str, " flags:%s", flags);
+	}
+	if (priv->cmdline != NULL)
+		g_string_append_printf(str, " cmdline:%s", priv->cmdline);
+	if (priv->max_age != G_MAXUINT32)
+		g_string_append_printf(str, " age:%u/%u", passim_item_get_age(self), priv->max_age);
+	if (priv->share_limit != G_MAXUINT32)
+		g_string_append_printf(str, " share:%u/%u", priv->share_count, priv->share_limit);
+	return g_string_free(str, FALSE);
 }
 
 static void

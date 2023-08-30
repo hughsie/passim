@@ -21,6 +21,8 @@ typedef struct {
 	GDBusNodeInfo *introspection_daemon;
 	GDBusProxy *proxy_uid;
 	GHashTable *items; /* utf-8:PassimItem */
+	GFileMonitor *sysconfpkg_monitor;
+	guint sysconfpkg_rescan_id;
 	GKeyFile *kf;
 	GMainLoop *loop;
 	PassimAvahi *avahi;
@@ -35,6 +37,8 @@ typedef struct {
 static void
 passim_server_free(PassimServer *self)
 {
+	if (self->sysconfpkg_rescan_id != 0)
+		g_source_remove(self->sysconfpkg_rescan_id);
 	if (self->poll_item_age_id != 0)
 		g_source_remove(self->poll_item_age_id);
 	if (self->timed_exit_id != 0)
@@ -43,6 +47,8 @@ passim_server_free(PassimServer *self)
 		g_main_loop_unref(self->loop);
 	if (self->avahi != NULL)
 		g_object_unref(self->avahi);
+	if (self->sysconfpkg_monitor != NULL)
+		g_object_unref(self->sysconfpkg_monitor);
 	if (self->items != NULL)
 		g_hash_table_unref(self->items);
 	if (self->kf != NULL)
@@ -103,6 +109,17 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 }
 
 static gboolean
+passim_server_add_item(PassimServer *self, PassimItem *item, GError **error)
+{
+	g_debug("added https://localhost:%u/%s?sha256=%s",
+		self->port,
+		passim_item_get_basename(item),
+		passim_item_get_hash(item));
+	g_hash_table_insert(self->items, g_strdup(passim_item_get_hash(item)), g_object_ref(item));
+	return TRUE;
+}
+
+static gboolean
 passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **error)
 {
 	guint32 value;
@@ -150,13 +167,7 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 			passim_item_add_flag(item, PASSIM_ITEM_FLAG_DISABLED);
 		}
 	}
-
-	g_debug("added https://localhost:%u/%s?sha256=%s",
-		self->port,
-		passim_item_get_basename(item),
-		passim_item_get_hash(item));
-	g_hash_table_insert(self->items, g_strdup(passim_item_get_hash(item)), g_object_ref(item));
-	return TRUE;
+	return passim_server_add_item(self, item, error);
 }
 
 static gboolean
@@ -178,6 +189,165 @@ passim_server_libdir_scan(PassimServer *self, GError **error)
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *path = g_build_filename(self->root, fn, NULL);
 		if (!passim_server_libdir_add(self, path, error))
+			return FALSE;
+	}
+	passim_server_engine_changed(self);
+	return TRUE;
+}
+
+static gboolean
+passim_server_sysconfpkgdir_add(PassimServer *self, const gchar *filename, GError **error)
+{
+	g_autofree gchar *hash = NULL;
+	g_autoptr(PassimItem) item = passim_item_new();
+
+	/* get optional attributes */
+	hash = passim_xattr_get_string(filename, "user.checksum.sha256", NULL);
+	if (hash != NULL && g_strcmp0(hash, "") != 0)
+		passim_item_set_hash(item, hash);
+
+	/* create new item */
+	if (!passim_item_load_filename(item, filename, error))
+		return FALSE;
+
+	/* never delete these */
+	passim_item_set_max_age(item, G_MAXUINT32);
+	passim_item_set_share_limit(item, G_MAXUINT32);
+
+	/* save this for next time */
+	if (hash == NULL || g_strcmp0(hash, "") == 0) {
+		passim_xattr_set_string(filename,
+					"user.checksum.sha256",
+					passim_item_get_hash(item),
+					NULL);
+	}
+	return passim_server_add_item(self, item, error);
+}
+
+static gboolean
+passim_server_sysconfpkgdir_scan_path(PassimServer *self, const gchar *path, GError **error)
+{
+	g_autoptr(GDir) dir = NULL;
+	const gchar *fn;
+
+	/* sanity check */
+	if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
+		g_debug("not loading resources from %s as it does not exist", path);
+		return TRUE;
+	}
+
+	g_debug("scanning %s", path);
+	dir = g_dir_open(path, 0, error);
+	if (dir == NULL)
+		return FALSE;
+	while ((fn = g_dir_read_name(dir)) != NULL) {
+		g_autofree gchar *fn_tmp = g_build_filename(path, fn, NULL);
+		if (!passim_server_sysconfpkgdir_add(self, fn_tmp, error))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static gboolean
+passim_server_sysconfpkgdir_scan_keyfile(PassimServer *self, const gchar *filename, GError **error)
+{
+	g_autofree gchar *path = NULL;
+	g_autoptr(GKeyFile) kf = g_key_file_new();
+
+	if (!g_key_file_load_from_file(kf, filename, G_KEY_FILE_NONE, error))
+		return FALSE;
+	path = g_key_file_get_string(kf, "passim", "Path", error);
+	if (path == NULL)
+		return FALSE;
+	return passim_server_sysconfpkgdir_scan_path(self, path, error);
+}
+
+static gboolean
+passim_server_sysconfpkgdir_scan(PassimServer *self, GError **error);
+
+static gboolean
+foo_cb(gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	g_autoptr(GError) error_local1 = NULL;
+	g_autoptr(GError) error_local2 = NULL;
+
+	/* done */
+	self->sysconfpkg_rescan_id = 0;
+
+	/* rescan and re-register */
+	if (!passim_server_sysconfpkgdir_scan(self, &error_local1))
+		g_printerr("failed to scan sysconfpkg directory: %s\n", error_local1->message);
+	if (!passim_server_avahi_register(self, &error_local2))
+		g_warning("failed to register: %s", error_local2->message);
+	return G_SOURCE_REMOVE;
+}
+
+static void
+passim_server_sysconfpkgdir_timemout_cb(GFileMonitor *monitor,
+					GFile *file,
+					GFile *other_file,
+					GFileMonitorEvent event_type,
+					gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+
+	/* rate limit */
+	if (self->sysconfpkg_rescan_id != 0)
+		g_source_remove(self->sysconfpkg_rescan_id);
+	self->sysconfpkg_rescan_id = g_timeout_add(500, foo_cb, self);
+}
+
+static gboolean
+passim_server_sysconfpkgdir_watch(PassimServer *self, GError **error)
+{
+	g_autofree gchar *sysconfpkgdir = g_build_filename(PACKAGE_SYSCONFDIR, "passim.d", NULL);
+	g_autoptr(GFile) file = g_file_new_for_path(sysconfpkgdir);
+
+	self->sysconfpkg_monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, NULL, error);
+	if (self->sysconfpkg_monitor == NULL)
+		return FALSE;
+	g_signal_connect(self->sysconfpkg_monitor,
+			 "changed",
+			 G_CALLBACK(passim_server_sysconfpkgdir_timemout_cb),
+			 self);
+	return TRUE;
+}
+
+static gboolean
+passim_server_sysconfpkgdir_scan(PassimServer *self, GError **error)
+{
+	const gchar *fn;
+	g_autofree gchar *sysconfpkgdir = g_build_filename(PACKAGE_SYSCONFDIR, "passim.d", NULL);
+	g_autoptr(GDir) dir = NULL;
+	g_autoptr(GList) items = g_hash_table_get_values(self->items);
+
+	/* remove all existing sysconfpkgdir items */
+	for (GList *l = items; l != NULL; l = l->next) {
+		PassimItem *item = PASSIM_ITEM(l->data);
+		if (passim_item_get_cmdline(item) == NULL &&
+		    passim_item_get_max_age(item) == G_MAXUINT32 &&
+		    passim_item_get_share_limit(item) == G_MAXUINT32) {
+			g_debug("removing %s due to rescan", passim_item_get_hash(item));
+			g_hash_table_remove(self->items, passim_item_get_hash(item));
+		}
+	}
+
+	/* sanity check */
+	if (!g_file_test(sysconfpkgdir, G_FILE_TEST_EXISTS)) {
+		g_debug("not loading resources from %s as it does not exist", sysconfpkgdir);
+		return TRUE;
+	}
+
+	g_debug("loading sysconfpkgdir config from %s", sysconfpkgdir);
+	dir = g_dir_open(sysconfpkgdir, 0, error);
+	if (dir == NULL)
+		return FALSE;
+	while ((fn = g_dir_read_name(dir)) != NULL) {
+		g_autofree gchar *fn_tmp = g_build_filename(sysconfpkgdir, fn, NULL);
+		if (!g_str_has_suffix(fn_tmp, ".conf"))
+			continue;
+		if (!passim_server_sysconfpkgdir_scan_keyfile(self, fn_tmp, error))
 			return FALSE;
 	}
 	passim_server_engine_changed(self);
@@ -292,17 +462,33 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 			g_string_append_printf(html,
 					       "<td><code>%s</code></td>\n",
 					       passim_item_get_hash(item));
-			g_string_append_printf(html,
-					       "<td><code>%s</code></td>\n",
-					       passim_item_get_cmdline(item));
-			g_string_append_printf(html,
-					       "<td>%u/%uh</td>\n",
-					       passim_item_get_age(item) / 3600u,
-					       passim_item_get_max_age(item) / 3600u);
-			g_string_append_printf(html,
-					       "<td>%u / %u</td>\n",
-					       passim_item_get_share_count(item),
-					       passim_item_get_share_limit(item));
+			if (passim_item_get_cmdline(item) == NULL) {
+				g_string_append_printf(html, "<td><code>n/a</code></td>\n");
+			} else {
+				g_string_append_printf(html,
+						       "<td><code>%s</code></td>\n",
+						       passim_item_get_cmdline(item));
+			}
+			if (passim_item_get_max_age(item) == G_MAXUINT32) {
+				g_string_append_printf(html,
+						       "<td>%u/∞h</td>\n",
+						       passim_item_get_age(item) / 3600u);
+			} else {
+				g_string_append_printf(html,
+						       "<td>%u/%uh</td>\n",
+						       passim_item_get_age(item) / 3600u,
+						       passim_item_get_max_age(item) / 3600u);
+			}
+			if (passim_item_get_share_limit(item) == G_MAXUINT32) {
+				g_string_append_printf(html,
+						       "<td>%u/∞</td>\n",
+						       passim_item_get_share_count(item));
+			} else {
+				g_string_append_printf(html,
+						       "<td>%u/%u</td>\n",
+						       passim_item_get_share_count(item),
+						       passim_item_get_share_limit(item));
+			}
 			g_string_append_printf(html, "<td><code>%s</code></td>\n", flags);
 			g_string_append(html, "</tr>");
 		}
@@ -387,7 +573,8 @@ passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimIt
 	passim_item_set_share_count(item, passim_item_get_share_count(item) + 1);
 
 	/* we've shared this enough now */
-	if (passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
+	if (passim_item_get_share_limit(item) > 0 &&
+	    passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
 		g_autoptr(GError) error = NULL;
 		g_debug("deleting %s as share limit reached", passim_item_get_hash(item));
 		if (!passim_server_delete_item(self, item, &error))
@@ -641,6 +828,8 @@ passim_server_check_item_age(PassimServer *self)
 		PassimItem *item = PASSIM_ITEM(l->data);
 		guint32 age = passim_item_get_age(item);
 
+		if (passim_item_get_max_age(item) == G_MAXUINT32)
+			continue;
 		if (age > passim_item_get_max_age(item)) {
 			g_autoptr(GError) error = NULL;
 			g_debug("deleting %s [%s] as max-age reached",
@@ -1106,6 +1295,14 @@ main(int argc, char *argv[])
 	}
 	if (!passim_server_libdir_scan(self, &error)) {
 		g_printerr("failed to scan directory: %s\n", error->message);
+		return 1;
+	}
+	if (!passim_server_sysconfpkgdir_watch(self, &error)) {
+		g_printerr("failed to watch sysconfpkg directory: %s\n", error->message);
+		return 1;
+	}
+	if (!passim_server_sysconfpkgdir_scan(self, &error)) {
+		g_printerr("failed to scan sysconfpkg directory: %s\n", error->message);
 		return 1;
 	}
 	if (!passim_avahi_connect(self->avahi, &error)) {
