@@ -79,8 +79,11 @@ passim_client_load(PassimClient *self, GError **error)
 						    PASSIM_DBUS_INTERFACE,
 						    NULL,
 						    error);
-	if (priv->proxy == NULL)
+	if (priv->proxy == NULL) {
+		if (error != NULL)
+			g_dbus_error_strip_remote_error(*error);
 		return FALSE;
+	}
 	version = g_dbus_proxy_get_cached_property(priv->proxy, "DaemonVersion");
 	if (version != NULL)
 		priv->version = g_variant_dup_string(version, NULL);
@@ -130,8 +133,13 @@ passim_client_get_items(PassimClient *self, GError **error)
 				     1500,
 				     NULL,
 				     error);
-	if (val == NULL)
-		return NULL;
+	if (val == NULL) {
+		if (error != NULL)
+			g_dbus_error_strip_remote_error(*error);
+		return FALSE;
+	}
+
+	/* success */
 	return passim_item_array_from_variant(val);
 }
 
@@ -165,7 +173,14 @@ passim_client_unpublish(PassimClient *self, const gchar *hash, GError **error)
 				     1500,
 				     NULL,
 				     error);
-	return val != NULL;
+	if (val == NULL) {
+		if (error != NULL)
+			g_dbus_error_strip_remote_error(*error);
+		return FALSE;
+	}
+
+	/* success */
+	return TRUE;
 }
 
 static GUnixInputStream *
@@ -299,8 +314,11 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 							   NULL,
 							   NULL, /* cancellable */
 							   error);
-	if (reply == NULL)
+	if (reply == NULL) {
+		if (error != NULL)
+			g_dbus_error_strip_remote_error(*error);
 		return FALSE;
+	}
 	if (g_dbus_message_to_gerror(reply, error))
 		return FALSE;
 
