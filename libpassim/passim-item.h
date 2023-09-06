@@ -97,6 +97,10 @@ guint32
 passim_item_get_share_limit(PassimItem *self);
 void
 passim_item_set_share_limit(PassimItem *self, guint32 share_limit);
+guint64
+passim_item_get_size(PassimItem *self);
+void
+passim_item_set_size(PassimItem *self, guint64 size);
 guint32
 passim_item_get_share_count(PassimItem *self);
 void

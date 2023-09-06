@@ -45,3 +45,10 @@ LIBPASSIM_0.1.0 {
     passim_version_string;
   local: *;
 };
+
+LIBPASSIM_0.1.2 {
+  global:
+    passim_item_get_size;
+    passim_item_set_size;
+  local: *;
+} LIBPASSIM_0.1.0;
