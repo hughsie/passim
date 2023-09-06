@@ -6,6 +6,8 @@
 
 #include "config.h"
 
+#include <locale.h>
+#include <libintl.h>
 #include <passim.h>
 
 #include "passim-common.h"
@@ -241,6 +243,13 @@ main(int argc, char *argv[])
 	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
 	    {"next-reboot", '\0', 0, G_OPTION_ARG_NONE, &self->next_reboot, "Next reboot", NULL},
 	    {NULL}};
+
+	setlocale(LC_ALL, "");
+
+	bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALEDIR);
+	bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
+	textdomain(GETTEXT_PACKAGE);
+
 	passim_cli_cmd_array_add(cmd_array, "dump", NULL, "Dump files shared", passim_cli_dump);
 	passim_cli_cmd_array_add(cmd_array,
 				 "publish",
