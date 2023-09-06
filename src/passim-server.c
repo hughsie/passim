@@ -444,6 +444,7 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 		g_string_append(html, "<th>Binary</th>\n");
 		g_string_append(html, "<th>Age</th>\n");
 		g_string_append(html, "<th>Shared</th>\n");
+		g_string_append(html, "<th>Size</th>\n");
 		g_string_append(html, "<th>Flags</th>\n");
 		g_string_append(html, "</tr>\n");
 		for (GList *l = keys; l != NULL; l = l->next) {
@@ -488,6 +489,12 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 						       "<td>%u/%u</td>\n",
 						       passim_item_get_share_count(item),
 						       passim_item_get_share_limit(item));
+			}
+			if (passim_item_get_size(item) == 0) {
+				g_string_append(html, "<td>?</td>\n");
+			} else {
+				g_autofree gchar *size = g_format_size(passim_item_get_size(item));
+				g_string_append_printf(html, "<td>%s</td>\n", size);
 			}
 			g_string_append_printf(html, "<td><code>%s</code></td>\n", flags);
 			g_string_append(html, "</tr>");

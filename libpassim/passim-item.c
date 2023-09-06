@@ -22,6 +22,7 @@ typedef struct {
 	guint32 max_age;
 	guint32 share_limit;
 	guint32 share_count;
+	guint64 size;
 	GFile *file;
 	GBytes *bytes;
 	GDateTime *ctime;
@@ -280,6 +281,41 @@ passim_item_set_share_count(PassimItem *self, guint32 share_count)
 }
 
 /**
+ * passim_item_get_size:
+ * @self: a #PassimItem
+ *
+ * Gets the size of the file in bytes.
+ *
+ * Returns: share limit, or 0 if unset
+ *
+ * Since: 0.1.2
+ **/
+guint64
+passim_item_get_size(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
+	return priv->size;
+}
+
+/**
+ * passim_item_set_size:
+ * @self: a #PassimItem
+ * @size: the share limit, or 0
+ *
+ * Sets the size of the file in bytes.
+ *
+ * Since: 0.1.2
+ **/
+void
+passim_item_set_size(PassimItem *self, guint64 size)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+	priv->size = size;
+}
+
+/**
  * passim_item_get_file:
  * @self: a #PassimItem
  *
@@ -354,8 +390,10 @@ passim_item_set_bytes(PassimItem *self, GBytes *bytes)
 		g_bytes_unref(priv->bytes);
 		priv->bytes = NULL;
 	}
-	if (bytes != NULL)
+	if (bytes != NULL) {
 		priv->bytes = g_bytes_ref(bytes);
+		priv->size = g_bytes_get_size(bytes);
+	}
 
 	/* generate checksum */
 	if (bytes != NULL && priv->hash == NULL)
@@ -511,6 +549,12 @@ passim_item_to_variant(PassimItem *self)
 				      "share-limit",
 				      g_variant_new_uint32(priv->share_limit));
 	}
+	if (priv->size != 0) {
+		g_variant_builder_add(&builder,
+				      "{sv}",
+				      "size",
+				      g_variant_new_uint64(priv->size));
+	}
 	if (priv->share_count != 0) {
 		g_variant_builder_add(&builder,
 				      "{sv}",
@@ -559,6 +603,8 @@ passim_item_from_variant(GVariant *variant)
 			priv->max_age = g_variant_get_uint32(value);
 		if (g_strcmp0(key, "share-limit") == 0)
 			priv->share_limit = g_variant_get_uint32(value);
+		if (g_strcmp0(key, "size") == 0)
+			priv->size = g_variant_get_uint64(value);
 		if (g_strcmp0(key, "share-count") == 0)
 			priv->share_count = g_variant_get_uint32(value);
 		if (g_strcmp0(key, "flags") == 0)
@@ -775,6 +821,10 @@ passim_item_to_string(PassimItem *self)
 		g_string_append_printf(str, " age:%u/%u", passim_item_get_age(self), priv->max_age);
 	if (priv->share_limit != G_MAXUINT32)
 		g_string_append_printf(str, " share:%u/%u", priv->share_count, priv->share_limit);
+	if (priv->size != 0) {
+		g_autofree gchar *size = g_format_size(priv->size);
+		g_string_append_printf(str, " size:%s", size);
+	}
 	return g_string_free(str, FALSE);
 }
 
