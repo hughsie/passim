@@ -26,12 +26,13 @@ typedef struct {
 	GKeyFile *kf;
 	GMainLoop *loop;
 	PassimAvahi *avahi;
+	GNetworkMonitor *network_monitor;
 	gchar *root;
 	guint16 port;
 	guint owner_id;
 	guint poll_item_age_id;
 	guint timed_exit_id;
-	gboolean http_active;
+	PassimStatus status;
 } PassimServer;
 
 static void
@@ -80,6 +81,48 @@ passim_server_engine_changed(PassimServer *self)
 				      NULL);
 }
 
+static void
+passim_server_emit_property_changed(PassimServer *self,
+				    const gchar *property_name,
+				    GVariant *property_value)
+{
+	GVariantBuilder builder;
+	GVariantBuilder invalidated_builder;
+
+	/* not yet connected */
+	if (self->connection == NULL) {
+		g_variant_unref(g_variant_ref_sink(property_value));
+		return;
+	}
+
+	/* build the dict */
+	g_variant_builder_init(&invalidated_builder, G_VARIANT_TYPE("as"));
+	g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
+	g_variant_builder_add(&builder, "{sv}", property_name, property_value);
+	g_dbus_connection_emit_signal(
+	    self->connection,
+	    NULL,
+	    PASSIM_DBUS_PATH,
+	    "org.freedesktop.DBus.Properties",
+	    "PropertiesChanged",
+	    g_variant_new("(sa{sv}as)", PASSIM_DBUS_INTERFACE, &builder, &invalidated_builder),
+	    NULL);
+	g_variant_builder_clear(&builder);
+	g_variant_builder_clear(&invalidated_builder);
+}
+
+static void
+passim_server_set_status(PassimServer *self, PassimStatus status)
+{
+	/* sanity check */
+	if (self->status == status)
+		return;
+	self->status = status;
+	g_debug("Emitting PropertyChanged('Status'='%s')", passim_status_to_string(status));
+	passim_server_emit_property_changed(self, "Status", g_variant_new_uint32(status));
+	passim_server_engine_changed(self);
+}
+
 static gboolean
 passim_server_avahi_register(PassimServer *self, GError **error)
 {
@@ -88,12 +131,19 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 	g_autoptr(GList) items = NULL;
 
 	/* sanity check */
-	if (!self->http_active) {
+	if (self->status == PASSIM_STATUS_STARTING) {
 		g_set_error(error,
 			    G_IO_ERROR,
 			    G_IO_ERROR_NOT_MOUNTED,
 			    "http server has not yet started");
 		return FALSE;
+	}
+
+	/* never publish when on a metered connection */
+	if (g_network_monitor_get_network_metered(self->network_monitor)) {
+		g_info("on a metered connection, unregistering");
+		passim_server_set_status(self, PASSIM_STATUS_DISABLED_METERED);
+		return passim_avahi_unregister(self->avahi, error);
 	}
 
 	/* build a GStrv of hashes */
@@ -105,7 +155,12 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 			continue;
 		keys[keyidx++] = passim_item_get_hash(item);
 	}
-	return passim_avahi_register(self->avahi, (gchar **)keys, error);
+	if (!passim_avahi_register(self->avahi, (gchar **)keys, error))
+		return FALSE;
+
+	/* success */
+	passim_server_set_status(self, PASSIM_STATUS_RUNNING);
+	return TRUE;
 }
 
 static gboolean
@@ -432,8 +487,11 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 	g_string_append_printf(html, "<h1>%s</h1>\n", passim_avahi_get_name(self->avahi));
 	g_string_append_printf(
 	    html,
-	    "<p>A <a href=\"https://github.com/hughsie/%s\">local caching server</a>.</p>\n",
-	    PACKAGE_NAME);
+	    "<p>A <a href=\"https://github.com/hughsie/%s\">local caching server</a>, "
+	    "version <code>%s</code> with status <code>%s</code>.</p>\n",
+	    PACKAGE_NAME,
+	    VERSION,
+	    passim_status_to_string(self->status));
 	if (keys == NULL) {
 		g_string_append(html, "<em>There are no shared files on this computer.</em>\n");
 	} else {
@@ -1084,8 +1142,12 @@ passim_server_get_property(GDBusConnection *connection_,
 			   GError **error,
 			   gpointer user_data)
 {
+	PassimServer *self = (PassimServer *)user_data;
+
 	if (g_strcmp0(property_name, "DaemonVersion") == 0)
 		return g_variant_new_string(SOURCE_VERSION);
+	if (g_strcmp0(property_name, "Status") == 0)
+		return g_variant_new_uint32(self->status);
 
 	/* return an error */
 	g_set_error(error,
@@ -1250,6 +1312,17 @@ passim_server_sigint_cb(gpointer user_data)
 	return FALSE;
 }
 
+static void
+passim_server_network_monitor_metered_changed_cb(GNetworkMonitor *network_monitor,
+						 GParamSpec *pspec,
+						 gpointer user_data)
+{
+	PassimServer *self = (PassimServer *)user_data;
+	g_autoptr(GError) error_local = NULL;
+	if (!passim_server_avahi_register(self, &error_local))
+		g_warning("failed to register: %s", error_local->message);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1282,6 +1355,7 @@ main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	}
 
+	self->status = PASSIM_STATUS_STARTING;
 	self->loop = g_main_loop_new(NULL, FALSE);
 	self->kf = passim_config_load(&error);
 	if (self->kf == NULL) {
@@ -1297,6 +1371,12 @@ main(int argc, char *argv[])
 	self->root = passim_config_get_path(self->kf);
 	self->items =
 	    g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_object_unref);
+	self->network_monitor = g_network_monitor_get_default();
+
+	g_signal_connect(G_NETWORK_MONITOR(self->network_monitor),
+			 "notify::network-metered",
+			 G_CALLBACK(passim_server_network_monitor_metered_changed_cb),
+			 self);
 	if (!passim_server_start_dbus(self, &error)) {
 		g_warning("failed to register D-Bus: %s", error->message);
 		return 1;
@@ -1336,7 +1416,7 @@ main(int argc, char *argv[])
 		g_autofree gchar *str = g_uri_to_string(u->data);
 		g_info("listening on %s", str);
 	}
-	self->http_active = TRUE;
+	self->status = PASSIM_STATUS_LOADING;
 
 	/* register objects with Avahi */
 	if (!passim_server_avahi_register(self, &error)) {

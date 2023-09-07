@@ -15,6 +15,20 @@
 #define PASSIM_CONFIG_PATH	    "Path"
 #define PASSIM_CONFIG_MAX_ITEM_SIZE "MaxItemSize"
 
+const gchar *
+passim_status_to_string(PassimStatus status)
+{
+	if (status == PASSIM_STATUS_STARTING)
+		return "starting";
+	if (status == PASSIM_STATUS_LOADING)
+		return "loading";
+	if (status == PASSIM_STATUS_DISABLED_METERED)
+		return "disabled-metered";
+	if (status == PASSIM_STATUS_RUNNING)
+		return "running";
+	return NULL;
+}
+
 GKeyFile *
 passim_config_load(GError **error)
 {

@@ -29,10 +29,20 @@ struct _PassimClientClass {
 #define PASSIM_DBUS_INTERFACE "org.freedesktop.Passim"
 #define PASSIM_DBUS_PATH      "/"
 
+typedef enum {
+	PASSIM_STATUS_UNKNOWN,
+	PASSIM_STATUS_STARTING,
+	PASSIM_STATUS_LOADING,
+	PASSIM_STATUS_RUNNING,
+	PASSIM_STATUS_DISABLED_METERED,
+} PassimStatus;
+
 PassimClient *
 passim_client_new(void);
 const gchar *
 passim_client_get_version(PassimClient *self);
+PassimStatus
+passim_client_get_status(PassimClient *self);
 gboolean
 passim_client_load(PassimClient *self, GError **error);
 GPtrArray *

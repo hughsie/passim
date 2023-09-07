@@ -28,6 +28,7 @@
 typedef struct {
 	GDBusProxy *proxy;
 	gchar *version;
+	PassimStatus status;
 } PassimClientPrivate;
 
 G_DEFINE_TYPE_WITH_PRIVATE(PassimClient, passim_client, G_TYPE_OBJECT)
@@ -52,6 +53,53 @@ passim_client_get_version(PassimClient *self)
 }
 
 /**
+ * passim_client_get_status:
+ * @self: a #PassimClient
+ *
+ * Gets the daemon status.
+ *
+ * Returns: the #PassimStatus
+ *
+ * Since: 0.1.2
+ **/
+PassimStatus
+passim_client_get_status(PassimClient *self)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_CLIENT(self), PASSIM_STATUS_UNKNOWN);
+	return priv->status;
+}
+
+static void
+passim_client_load_proxy_properties(PassimClient *self)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_autoptr(GVariant) status = NULL;
+	g_autoptr(GVariant) version = NULL;
+
+	version = g_dbus_proxy_get_cached_property(priv->proxy, "DaemonVersion");
+	if (version != NULL) {
+		g_free(priv->version);
+		priv->version = g_variant_dup_string(version, NULL);
+	}
+	status = g_dbus_proxy_get_cached_property(priv->proxy, "Status");
+	if (status != NULL)
+		priv->status = g_variant_get_uint32(status);
+}
+
+static void
+passim_client_proxy_signal_cb(GDBusProxy *proxy,
+			      const gchar *sender_name,
+			      const gchar *signal_name,
+			      GVariant *parameters,
+			      gpointer user_data)
+{
+	PassimClient *self = PASSIM_CLIENT(user_data);
+	if (g_strcmp0(signal_name, "Changed") == 0)
+		passim_client_load_proxy_properties(self);
+}
+
+/**
  * passim_client_load:
  * @self: a #PassimClient
  * @error: (nullable): optional return location for an error
@@ -66,7 +114,6 @@ gboolean
 passim_client_load(PassimClient *self, GError **error)
 {
 	PassimClientPrivate *priv = GET_PRIVATE(self);
-	g_autoptr(GVariant) version = NULL;
 
 	g_return_val_if_fail(PASSIM_IS_CLIENT(self), FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
@@ -84,9 +131,11 @@ passim_client_load(PassimClient *self, GError **error)
 			g_dbus_error_strip_remote_error(*error);
 		return FALSE;
 	}
-	version = g_dbus_proxy_get_cached_property(priv->proxy, "DaemonVersion");
-	if (version != NULL)
-		priv->version = g_variant_dup_string(version, NULL);
+	g_signal_connect(G_DBUS_PROXY(priv->proxy),
+			 "g-signal",
+			 G_CALLBACK(passim_client_proxy_signal_cb),
+			 self);
+	passim_client_load_proxy_properties(self);
 
 	/* success */
 	return TRUE;

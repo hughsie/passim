@@ -6,8 +6,10 @@
 
 #pragma once
 
-#include <gio/gio.h>
+#include <passim.h>
 
+const gchar *
+passim_status_to_string(PassimStatus status);
 GKeyFile *
 passim_config_load(GError **error);
 guint16
