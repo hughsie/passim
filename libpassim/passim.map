@@ -48,6 +48,7 @@ LIBPASSIM_0.1.0 {
 
 LIBPASSIM_0.1.2 {
   global:
+    passim_client_get_status;
     passim_item_get_size;
     passim_item_set_size;
   local: *;

@@ -42,6 +42,8 @@ passim_avahi_new(GKeyFile *config);
 gboolean
 passim_avahi_connect(PassimAvahi *self, GError **error);
 gboolean
+passim_avahi_unregister(PassimAvahi *self, GError **error);
+gboolean
 passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error);
 const gchar *
 passim_avahi_get_name(PassimAvahi *self);

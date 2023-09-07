@@ -165,8 +165,21 @@ passim_cli_cmd_array_to_string(GPtrArray *array)
 static gboolean
 passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 {
+	PassimStatus status = passim_client_get_status(self->client);
 	g_autoptr(GPtrArray) items = NULL;
 
+	/* global status */
+	if (status == PASSIM_STATUS_STARTING || status == PASSIM_STATUS_LOADING) {
+		g_print("passimd is loading…\n");
+	} else if (status == PASSIM_STATUS_DISABLED_METERED) {
+		g_print("passimd is disabled as a metered network connection is detected\n");
+	} else if (status == PASSIM_STATUS_RUNNING) {
+		g_print("passimd is running\n");
+	} else {
+		g_print("passimd status: %s\n", passim_status_to_string(status));
+	}
+
+	/* all items */
 	items = passim_client_get_items(self->client, error);
 	if (items == NULL)
 		return FALSE;

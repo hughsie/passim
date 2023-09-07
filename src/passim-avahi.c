@@ -139,14 +139,11 @@ passim_avahi_register_subtype(PassimAvahi *self, const gchar *hash, GError **err
 }
 
 gboolean
-passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
+passim_avahi_unregister(PassimAvahi *self, GError **error)
 {
 	g_autoptr(GVariant) val1 = NULL;
-	g_autoptr(GVariant) val2 = NULL;
-	g_autoptr(GVariant) val4 = NULL;
 
 	g_return_val_if_fail(PASSIM_IS_AVAHI(self), FALSE);
-	g_return_val_if_fail(keys != NULL, FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 	g_return_val_if_fail(self->proxy != NULL, FALSE);
 
@@ -162,6 +159,24 @@ passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
 		g_prefix_error(error, "failed to reset entry group: ");
 		return FALSE;
 	}
+
+	/* success */
+	return TRUE;
+}
+
+gboolean
+passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
+{
+	g_autoptr(GVariant) val2 = NULL;
+	g_autoptr(GVariant) val4 = NULL;
+
+	g_return_val_if_fail(PASSIM_IS_AVAHI(self), FALSE);
+	g_return_val_if_fail(keys != NULL, FALSE);
+	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+	g_return_val_if_fail(self->proxy != NULL, FALSE);
+
+	if (!passim_avahi_unregister(self, error))
+		return FALSE;
 	val2 = g_dbus_proxy_call_sync(self->proxy_eg,
 				      "AddService",
 				      g_variant_new("(iiussssqaay)",

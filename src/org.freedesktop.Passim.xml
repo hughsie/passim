@@ -20,6 +20,15 @@
         </doc:description>
       </doc:doc>
     </property>
+    <property name='Status' type='u' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The daemon current status.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
     <method name='GetItems'>
       <doc:doc>
         <doc:description>
