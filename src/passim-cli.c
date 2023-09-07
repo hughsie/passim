@@ -6,8 +6,8 @@
 
 #include "config.h"
 
-#include <locale.h>
 #include <libintl.h>
+#include <locale.h>
 #include <passim.h>
 
 #include "passim-common.h"

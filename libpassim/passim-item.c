@@ -549,12 +549,8 @@ passim_item_to_variant(PassimItem *self)
 				      "share-limit",
 				      g_variant_new_uint32(priv->share_limit));
 	}
-	if (priv->size != 0) {
-		g_variant_builder_add(&builder,
-				      "{sv}",
-				      "size",
-				      g_variant_new_uint64(priv->size));
-	}
+	if (priv->size != 0)
+		g_variant_builder_add(&builder, "{sv}", "size", g_variant_new_uint64(priv->size));
 	if (priv->share_count != 0) {
 		g_variant_builder_add(&builder,
 				      "{sv}",
