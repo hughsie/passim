@@ -266,7 +266,7 @@ static gboolean
 passim_server_sysconfpkgdir_scan(PassimServer *self, GError **error);
 
 static gboolean
-foo_cb(gpointer user_data)
+passim_server_sysconfpkgdir_timeout_cb(gpointer user_data)
 {
 	PassimServer *self = (PassimServer *)user_data;
 	g_autoptr(GError) error_local1 = NULL;
@@ -284,18 +284,19 @@ foo_cb(gpointer user_data)
 }
 
 static void
-passim_server_sysconfpkgdir_timemout_cb(GFileMonitor *monitor,
-					GFile *file,
-					GFile *other_file,
-					GFileMonitorEvent event_type,
-					gpointer user_data)
+passim_server_sysconfpkgdir_changed_cb(GFileMonitor *monitor,
+				       GFile *file,
+				       GFile *other_file,
+				       GFileMonitorEvent event_type,
+				       gpointer user_data)
 {
 	PassimServer *self = (PassimServer *)user_data;
 
 	/* rate limit */
 	if (self->sysconfpkg_rescan_id != 0)
 		g_source_remove(self->sysconfpkg_rescan_id);
-	self->sysconfpkg_rescan_id = g_timeout_add(500, foo_cb, self);
+	self->sysconfpkg_rescan_id =
+	    g_timeout_add(500, passim_server_sysconfpkgdir_timeout_cb, self);
 }
 
 static gboolean
@@ -309,7 +310,7 @@ passim_server_sysconfpkgdir_watch(PassimServer *self, GError **error)
 		return FALSE;
 	g_signal_connect(self->sysconfpkg_monitor,
 			 "changed",
-			 G_CALLBACK(passim_server_sysconfpkgdir_timemout_cb),
+			 G_CALLBACK(passim_server_sysconfpkgdir_changed_cb),
 			 self);
 	return TRUE;
 }
