@@ -27,11 +27,16 @@ BuildRequires: systemd >= %{systemd_version}
 Requires: glib2%{?_isa} >= %{glib2_version}
 Requires: %{name}-libs%{?_isa} = %{version}-%{release}
 
+# Obsolete versions from before the subpackage split
+Obsoletes: %{name} < 0.1.1-3
+
 %description
 Passim is a daemon that allows software to share files on your local network.
 
 %package libs
 Summary: Local caching server library
+# Obsolete versions from before the subpackage split
+Obsoletes: %{name} < 0.1.1-3
 
 %description libs
 libpassim is a library that allows software to share files on your local network
