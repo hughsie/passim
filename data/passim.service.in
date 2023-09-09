@@ -1,8 +1,9 @@
 [Unit]
 Description=A local caching server
 Documentation=https://github.com/hughsie/passim
-After=dbus.service
+After=avahi-daemon.service
 Before=display-manager.service
+Wants=avahi-daemon.service
 
 [Service]
 Type=dbus
