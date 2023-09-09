@@ -24,6 +24,8 @@ BuildRequires: meson
 BuildRequires: systemd-rpm-macros
 BuildRequires: systemd >= %{systemd_version}
 
+Recommends: avahi
+
 Requires: glib2%{?_isa} >= %{glib2_version}
 Requires: %{name}-libs%{?_isa} = %{version}-%{release}
 
