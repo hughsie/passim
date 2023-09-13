@@ -99,7 +99,7 @@ IPFS:
 
  * existing project that's existed for many years tested by many people
  * allows sharing with other users not on your local network
- * not packaged in any distributions and not trivial to install correctly
+ * not packaged in many distributions and not trivial to install correctly
  * requires a significant time to find resources
  * does not prioritize local clients over remote clients
  * requires a internet<->IPFS "gateway" which cost $$$ for a large number of files
