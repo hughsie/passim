@@ -20,6 +20,23 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.2" date="2023-09-25">
+      <description>
+        <p>
+          This release adds the following features:
+        </p>
+        <ul>
+          <li>Add file size information into the exported item</li>
+          <li>Allow admins to add a directory of static contents</li>
+        </ul>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Do not advertise files when on a metered network connection</li>
+          <li>Do not fail to start the service if /var/lib/passim/data does not exist</li>
+          <li>Explicitly depend on avahi-daemon in passim.service</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.1" date="2023-08-24">
       <description>
         <p>This release fixes the following bugs:</p>
