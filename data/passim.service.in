@@ -1,5 +1,5 @@
 [Unit]
-Description=A local caching server
+Description=Local Caching Server
 Documentation=https://github.com/hughsie/passim
 After=avahi-daemon.service
 Before=display-manager.service
