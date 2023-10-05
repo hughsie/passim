@@ -1,6 +1,11 @@
 install_data(['passim.conf'],
   install_dir: sysconfdir,
 )
+install_data(
+  'passim.sysusers.conf',
+  rename: ['passim.conf'],
+  install_dir: sysusersdir,
+)
 install_data(['favicon.ico', 'style.css'],
   install_dir: join_paths(datadir, meson.project_name()),
 )

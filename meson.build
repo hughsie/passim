@@ -99,10 +99,15 @@ conf.set('MICRO_VERSION', varr[2])
 systemd = dependency('systemd', version: '>= 211')
 systemd_root_prefix = get_option('systemd_root_prefix')
 if systemd_root_prefix == ''
-  systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
+  pkgconfig_kwargs = {}
 else
-  systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir', pkgconfig_define: ['rootprefix', systemd_root_prefix])
+  pkgconfig_kwargs = {
+    'pkgconfig_define': ['rootprefix', systemd_root_prefix],
+  }
 endif
+
+systemdunitdir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir', kwargs: pkgconfig_kwargs)
+sysusersdir = systemd.get_variable(pkgconfig: 'sysusersdir', kwargs: pkgconfig_kwargs)
 
 # get source version, falling back to package version
 git = find_program('git', required: false)
