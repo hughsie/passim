@@ -1,8 +1,10 @@
-install_data(['org.freedesktop.Passim.xml'],
-  install_dir: join_paths(datadir, 'dbus-1', 'interfaces'),
+install_data(
+  'org.freedesktop.Passim.xml',
+  install_dir: datadir / 'dbus-1/interfaces',
 )
-install_data(['passim.1'],
-  install_dir: join_paths(datadir, 'man', 'man1'),
+install_data(
+  'passim.1',
+  install_dir: datadir / 'man/man1',
 )
 
 executable(
