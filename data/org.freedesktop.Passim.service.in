@@ -2,6 +2,6 @@
 Name=org.freedesktop.Passim
 Documentation=https://github.com/hughsie/passim
 Exec=@libexecdir@/passimd
-User=root
+User=passim
 SystemdService=passim.service
 AssumedAppArmorLabel=unconfined
