@@ -199,6 +199,9 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 	if (!passim_item_load_filename(item, filename, error))
 		return FALSE;
 
+	/* not required now */
+	passim_item_set_bytes(item, NULL);
+
 	/* get optional attributes */
 	value = passim_xattr_get_uint32(filename, "user.max_age", 24 * 60 * 60, error);
 	if (value == G_MAXUINT32)
@@ -264,6 +267,9 @@ passim_server_sysconfpkgdir_add(PassimServer *self, const gchar *filename, GErro
 	/* create new item */
 	if (!passim_item_load_filename(item, filename, error))
 		return FALSE;
+
+	/* not required now */
+	passim_item_set_bytes(item, NULL);
 
 	/* never delete these */
 	passim_item_set_max_age(item, G_MAXUINT32);
