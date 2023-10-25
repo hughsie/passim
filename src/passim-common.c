@@ -257,7 +257,7 @@ passim_load_input_stream(GInputStream *stream, gsize count, GError **error)
 		if (buf->len > count) {
 			g_set_error(error,
 				    G_IO_ERROR,
-				    G_IO_ERROR_INVALID_DATA,
+				    G_IO_ERROR_NO_SPACE,
 				    "cannot read from fd: 0x%x > 0x%x",
 				    buf->len,
 				    (guint)count);

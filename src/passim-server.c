@@ -1084,6 +1084,17 @@ passim_server_method_call(GDBusConnection *connection,
 						passim_config_get_max_item_size(self->kf),
 						&error);
 		if (blob == NULL) {
+			if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_NO_SPACE)) {
+				g_autofree gchar *size =
+				    g_format_size(passim_config_get_max_item_size(self->kf));
+				g_dbus_method_invocation_return_error(
+				    invocation,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_DATA,
+				    "Failed to load file, size limit is %s",
+				    size);
+				return;
+			}
 			g_dbus_method_invocation_return_gerror(invocation, error);
 			return;
 		}
