@@ -45,10 +45,10 @@ passim_config_load(GError **error)
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL))
 		g_key_file_set_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, 27500);
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL)) {
-		g_key_file_set_integer(kf,
-				       PASSIM_CONFIG_GROUP,
-				       PASSIM_CONFIG_MAX_ITEM_SIZE,
-				       100 * 1024 * 1024);
+		g_key_file_set_uint64(kf,
+				      PASSIM_CONFIG_GROUP,
+				      PASSIM_CONFIG_MAX_ITEM_SIZE,
+				      100 * 1024 * 1024);
 	}
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, NULL)) {
 		g_autofree gchar *path =
@@ -68,7 +68,7 @@ passim_config_get_port(GKeyFile *kf)
 gsize
 passim_config_get_max_item_size(GKeyFile *kf)
 {
-	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL);
+	return g_key_file_get_uint64(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL);
 }
 
 gchar *
