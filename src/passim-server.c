@@ -630,10 +630,11 @@ passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimIt
 {
 	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(msg);
 	g_autofree gchar *content_disposition = NULL;
+	g_autofree gchar *filename = NULL;
 	g_autofree gchar *path = g_file_get_path(passim_item_get_file(item));
 
-	content_disposition =
-	    g_strdup_printf("attachment; filename=\"%s\"", passim_item_get_basename(item));
+	filename = g_uri_escape_string(passim_item_get_basename(item), NULL, TRUE);
+	content_disposition = g_strdup_printf("attachment; filename=\"%s\"", filename);
 	soup_message_headers_append(hdrs, "Content-Disposition", content_disposition);
 
 	passim_server_msg_send_file(self, msg, path);
