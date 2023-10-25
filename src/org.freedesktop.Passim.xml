@@ -7,7 +7,6 @@
       <doc:description>
         <doc:para>
           The interface used for interacting with Passim.
-          You must be the root user to interact with this interface.
         </doc:para>
       </doc:description>
     </doc:doc>
@@ -34,6 +33,7 @@
         <doc:description>
           <doc:para>
             Gets the hashes of index.
+            NOTE: This can only be called by any user.
           </doc:para>
         </doc:description>
       </doc:doc>
@@ -50,6 +50,7 @@
         <doc:description>
           <doc:para>
             Adds a file to the index.
+            NOTE: This can only be called by the root user.
           </doc:para>
         </doc:description>
       </doc:doc>
@@ -73,6 +74,7 @@
         <doc:description>
           <doc:para>
             Unpublish a file from the index.
+            NOTE: This can only be called by the root user.
           </doc:para>
         </doc:description>
       </doc:doc>
