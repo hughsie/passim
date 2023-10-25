@@ -587,7 +587,8 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 					   g_mapped_file_get_length(mapping),
 					   (GDestroyNotify)g_mapped_file_unref,
 					   mapping);
-	soup_message_body_append_bytes(soup_server_message_get_response_body(msg), bytes);
+	if (g_bytes_get_size(bytes) > 0)
+		soup_message_body_append_bytes(soup_server_message_get_response_body(msg), bytes);
 	soup_server_message_set_status(msg, SOUP_STATUS_OK, NULL);
 
 	info = g_file_query_info(file,
