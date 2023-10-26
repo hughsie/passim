@@ -755,6 +755,10 @@ passim_server_handler_cb(SoupServer *server,
 	}
 
 	/* find the request hash argument */
+	if (g_uri_get_query(uri) == NULL) {
+		passim_server_msg_send_error(self, msg, SOUP_STATUS_BAD_REQUEST, NULL);
+		return;
+	}
 	request = g_strsplit(g_uri_get_query(uri), "&", -1);
 	for (guint i = 0; request[i] != NULL; i++) {
 		g_auto(GStrv) kv = g_strsplit(request[i], "=", -1);
