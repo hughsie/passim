@@ -303,8 +303,17 @@ passim_server_sysconfpkgdir_scan_path(PassimServer *self, const gchar *path, GEr
 		return FALSE;
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *fn_tmp = g_build_filename(path, fn, NULL);
-		if (!passim_server_sysconfpkgdir_add(self, fn_tmp, error))
+		g_autoptr(GError) error_local = NULL;
+		if (!passim_server_sysconfpkgdir_add(self, fn_tmp, &error_local)) {
+			if (g_error_matches(error_local,
+					    G_IO_ERROR,
+					    G_IO_ERROR_PERMISSION_DENIED)) {
+				g_info("skipping %s as EPERM", fn_tmp);
+				continue;
+			}
+			g_propagate_error(error, g_steal_pointer(&error_local));
 			return FALSE;
+		}
 	}
 	return TRUE;
 }
