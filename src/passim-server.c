@@ -246,6 +246,10 @@ passim_server_libdir_scan(PassimServer *self, GError **error)
 		return FALSE;
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *path = g_build_filename(self->root, fn, NULL);
+		if (g_file_test(path, G_FILE_TEST_IS_SYMLINK)) {
+			g_info("skipping symlink %s", path);
+			continue;
+		}
 		if (!passim_server_libdir_add(self, path, error))
 			return FALSE;
 	}
@@ -304,6 +308,10 @@ passim_server_sysconfpkgdir_scan_path(PassimServer *self, const gchar *path, GEr
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *fn_tmp = g_build_filename(path, fn, NULL);
 		g_autoptr(GError) error_local = NULL;
+		if (g_file_test(fn_tmp, G_FILE_TEST_IS_SYMLINK)) {
+			g_info("skipping symlink %s", fn_tmp);
+			continue;
+		}
 		if (!passim_server_sysconfpkgdir_add(self, fn_tmp, &error_local)) {
 			if (g_error_matches(error_local,
 					    G_IO_ERROR,
