@@ -138,6 +138,10 @@ passim_item_get_cmdline(PassimItem *self)
  *
  * Sets the cmdline of the binary that published the item.
  *
+ * NOTE: this is desgined as a hint, and should not be used for security. The command line is
+ * obtained via /proc/<pid>/cmdline and it may be possible to falsify the data by a malicious
+ * binary running as root under certain conditions.
+ *
  * Since: 0.1.0
  **/
 void
