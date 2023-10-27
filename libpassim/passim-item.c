@@ -351,6 +351,11 @@ passim_item_set_file(PassimItem *self, GFile *file)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_return_if_fail(PASSIM_IS_ITEM(self));
+
+	/* if not already set */
+	if (file != NULL && priv->basename == NULL)
+		priv->basename = g_file_get_basename(file);
+
 	g_set_object(&priv->file, file);
 }
 
