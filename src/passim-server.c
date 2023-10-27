@@ -9,6 +9,7 @@
 #include <gio/gunixfdlist.h>
 #include <gio/gunixinputstream.h>
 #include <glib-unix.h>
+#include <glib/gstdio.h>
 #include <libsoup/soup.h>
 #include <passim.h>
 
@@ -175,6 +176,41 @@ passim_server_add_item(PassimServer *self, PassimItem *item, GError **error)
 }
 
 static gboolean
+passim_item_load_bytes_nofollow(PassimItem *item, const gchar *filename, GError **error)
+{
+	gint fd;
+	g_autoptr(GBytes) bytes = NULL;
+	g_autoptr(GInputStream) istream = NULL;
+	g_autoptr(GMappedFile) mapped_file = NULL;
+
+	/* load bytes from the fd to avoid TOCTOU */
+	fd = g_open(filename, O_NOFOLLOW, S_IRUSR);
+	if (fd < 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_PERMISSION_DENIED,
+			    "skipping symlink %s",
+			    filename);
+		return FALSE;
+	}
+	istream = g_unix_input_stream_new(fd, TRUE);
+	if (istream == NULL) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_FAILED,
+			    "no stream to read from %s",
+			    filename);
+		return FALSE;
+	}
+	mapped_file = g_mapped_file_new_from_fd(fd, FALSE, error);
+	if (mapped_file == NULL)
+		return FALSE;
+	bytes = g_mapped_file_get_bytes(mapped_file);
+	passim_item_set_bytes(item, bytes);
+	return TRUE;
+}
+
+static gboolean
 passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **error)
 {
 	guint32 value;
@@ -196,6 +232,8 @@ passim_server_libdir_add(PassimServer *self, const gchar *filename, GError **err
 
 	/* create new item */
 	passim_item_set_basename(item, split[1]);
+	if (!passim_item_load_bytes_nofollow(item, filename, error))
+		return FALSE;
 	if (!passim_item_load_filename(item, filename, error))
 		return FALSE;
 
@@ -246,10 +284,6 @@ passim_server_libdir_scan(PassimServer *self, GError **error)
 		return FALSE;
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *path = g_build_filename(self->root, fn, NULL);
-		if (g_file_test(path, G_FILE_TEST_IS_SYMLINK)) {
-			g_info("skipping symlink %s", path);
-			continue;
-		}
 		if (!passim_server_libdir_add(self, path, error))
 			return FALSE;
 	}
@@ -267,8 +301,8 @@ passim_server_sysconfpkgdir_add(PassimServer *self, const gchar *filename, GErro
 	hash = passim_xattr_get_string(filename, "user.checksum.sha256", NULL);
 	if (hash != NULL && g_strcmp0(hash, "") != 0)
 		passim_item_set_hash(item, hash);
-
-	/* create new item */
+	if (!passim_item_load_bytes_nofollow(item, filename, error))
+		return FALSE;
 	if (!passim_item_load_filename(item, filename, error))
 		return FALSE;
 
@@ -308,10 +342,6 @@ passim_server_sysconfpkgdir_scan_path(PassimServer *self, const gchar *path, GEr
 	while ((fn = g_dir_read_name(dir)) != NULL) {
 		g_autofree gchar *fn_tmp = g_build_filename(path, fn, NULL);
 		g_autoptr(GError) error_local = NULL;
-		if (g_file_test(fn_tmp, G_FILE_TEST_IS_SYMLINK)) {
-			g_info("skipping symlink %s", fn_tmp);
-			continue;
-		}
 		if (!passim_server_sysconfpkgdir_add(self, fn_tmp, &error_local)) {
 			if (g_error_matches(error_local,
 					    G_IO_ERROR,
