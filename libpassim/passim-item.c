@@ -351,6 +351,11 @@ passim_item_set_file(PassimItem *self, GFile *file)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
 	g_return_if_fail(PASSIM_IS_ITEM(self));
+
+	/* if not already set */
+	if (file != NULL && priv->basename == NULL)
+		priv->basename = g_file_get_basename(file);
+
 	g_set_object(&priv->file, file);
 }
 
@@ -471,35 +476,34 @@ gboolean
 passim_item_load_filename(PassimItem *self, const gchar *filename, GError **error)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
-	g_autoptr(GFile) file = NULL;
-	g_autoptr(GBytes) bytes = NULL;
-	g_autoptr(GFileInfo) info = NULL;
 
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), FALSE);
 	g_return_val_if_fail(filename != NULL, FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
 	/* set file and bytes (which also sets the hash too) */
-	file = g_file_new_for_path(filename);
-	passim_item_set_file(self, file);
-	bytes = g_file_load_bytes(file, NULL, NULL, error);
-	if (bytes == NULL)
-		return FALSE;
-	passim_item_set_bytes(self, bytes);
-
-	/* get ctime */
-	info = g_file_query_info(file,
-				 G_FILE_ATTRIBUTE_TIME_CREATED,
-				 G_FILE_QUERY_INFO_NONE,
-				 NULL,
-				 error);
-	if (info == NULL)
-		return FALSE;
-	priv->ctime = g_file_info_get_creation_date_time(info);
-
-	/* if not already set */
+	if (priv->file == NULL) {
+		g_autoptr(GFile) file = g_file_new_for_path(filename);
+		passim_item_set_file(self, file);
+	}
+	if (priv->bytes == NULL) {
+		g_autoptr(GBytes) bytes = g_file_load_bytes(priv->file, NULL, NULL, error);
+		if (bytes == NULL)
+			return FALSE;
+		passim_item_set_bytes(self, bytes);
+	}
+	if (priv->ctime == NULL) {
+		g_autoptr(GFileInfo) info = g_file_query_info(priv->file,
+							      G_FILE_ATTRIBUTE_TIME_CREATED,
+							      G_FILE_QUERY_INFO_NONE,
+							      NULL,
+							      error);
+		if (info == NULL)
+			return FALSE;
+		priv->ctime = g_file_info_get_creation_date_time(info);
+	}
 	if (priv->basename == NULL)
-		priv->basename = g_path_get_basename(filename);
+		priv->basename = g_file_get_basename(priv->file);
 
 	/* success */
 	return TRUE;
