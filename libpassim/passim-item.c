@@ -6,6 +6,8 @@
 
 #include "config.h"
 
+#include <gio/gunixinputstream.h>
+
 #include "passim-item.h"
 
 /**
@@ -25,6 +27,7 @@ typedef struct {
 	guint64 size;
 	GFile *file;
 	GBytes *bytes;
+	GInputStream *stream;
 	GDateTime *ctime;
 } PassimItemPrivate;
 
@@ -407,6 +410,44 @@ passim_item_set_bytes(PassimItem *self, GBytes *bytes)
 	/* generate checksum */
 	if (bytes != NULL && priv->hash == NULL)
 		priv->hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, bytes);
+}
+
+/**
+ * passim_item_get_stream:
+ * @self: a #PassimItem
+ *
+ * Gets the input stream for the item.
+ *
+ * Returns: (transfer none): a #GInputStream, or %NULL if unset
+ *
+ * Since: 0.1.5
+ **/
+GInputStream *
+passim_item_get_stream(PassimItem *self)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
+	return priv->stream;
+}
+
+/**
+ * passim_item_set_stream:
+ * @self: a #PassimItem
+ * @stream: (nullable): a #GInputStream
+ *
+ * Sets the input stream stream for the item.
+ *
+ * NOTE: This *MUST* be a #GUnixInputStream, or subclass thereof.
+ *
+ * Since: 0.1.5
+ **/
+void
+passim_item_set_stream(PassimItem *self, GInputStream *stream)
+{
+	PassimItemPrivate *priv = GET_PRIVATE(self);
+	g_return_if_fail(PASSIM_IS_ITEM(self));
+	g_return_if_fail(G_IS_UNIX_INPUT_STREAM(stream));
+	g_set_object(&priv->stream, stream);
 }
 
 /**
@@ -850,6 +891,8 @@ passim_item_finalize(GObject *object)
 		g_object_unref(priv->file);
 	if (priv->bytes != NULL)
 		g_bytes_unref(priv->bytes);
+	if (priv->stream != NULL)
+		g_object_unref(priv->stream);
 	if (priv->ctime != NULL)
 		g_date_time_unref(priv->ctime);
 	g_free(priv->hash);

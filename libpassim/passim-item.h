@@ -113,6 +113,10 @@ GBytes *
 passim_item_get_bytes(PassimItem *self);
 void
 passim_item_set_bytes(PassimItem *self, GBytes *bytes);
+GInputStream *
+passim_item_get_stream(PassimItem *self);
+void
+passim_item_set_stream(PassimItem *self, GInputStream *stream);
 GDateTime *
 passim_item_get_ctime(PassimItem *self);
 void
