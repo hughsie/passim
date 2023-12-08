@@ -53,3 +53,10 @@ LIBPASSIM_0.1.2 {
     passim_item_set_size;
   local: *;
 } LIBPASSIM_0.1.0;
+
+LIBPASSIM_0.1.5 {
+  global:
+    passim_item_get_stream;
+    passim_item_set_stream;
+  local: *;
+} LIBPASSIM_0.1.2;

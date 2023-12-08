@@ -327,7 +327,9 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
 	/* set out of band file descriptor */
-	if (passim_item_get_file(item) != NULL) {
+	if (passim_item_get_stream(item) != NULL) {
+		istream = g_object_ref(G_UNIX_INPUT_STREAM(passim_item_get_stream(item)));
+	} else if (passim_item_get_file(item) != NULL) {
 		g_autofree gchar *filename = g_file_get_path(passim_item_get_file(item));
 		istream = passim_client_input_stream_from_filename(filename, error);
 		if (istream == NULL)
