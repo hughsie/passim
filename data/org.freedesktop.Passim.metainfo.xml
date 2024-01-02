@@ -20,6 +20,14 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.5" date="2024-01-02">
+      <description>
+        <p>This release adds some new API for fwupd to use.</p>
+        <ul>
+          <li>Add passim_item_set_stream()</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.4" date="2023-10-27">
       <description>
         <p>This release fixes the following bugs:</p>
