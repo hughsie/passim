@@ -948,7 +948,7 @@ static void
 passim_server_check_item_age(PassimServer *self)
 {
 	g_autoptr(GList) items = g_hash_table_get_values(self->items);
-	g_info("checking for max-age");
+	g_debug("checking for max-age");
 	for (GList *l = items; l != NULL; l = l->next) {
 		PassimItem *item = PASSIM_ITEM(l->data);
 		guint32 age = passim_item_get_age(item);
