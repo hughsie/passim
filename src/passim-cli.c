@@ -6,6 +6,7 @@
 
 #include "config.h"
 
+#include <glib/gi18n.h>
 #include <libintl.h>
 #include <locale.h>
 #include <passim.h>
@@ -167,6 +168,23 @@ typedef struct {
 	gchar *value;
 } PassimItemAttr;
 
+static gchar *
+passim_cli_item_flag_to_string(PassimItemFlags flags)
+{
+	const gchar *strv[4] = {NULL};
+	guint i = 0;
+
+	if (flags & PASSIM_ITEM_FLAG_DISABLED) {
+		/* TRANSLATORS: the item is not enabled */
+		strv[i++] = _("Disabled");
+	}
+	if (flags & PASSIM_ITEM_FLAG_NEXT_REBOOT) {
+		/* TRANSLATORS: only begin sharing the item after the next restart */
+		strv[i++] = _("Next Reboot");
+	}
+	return g_strjoinv(", ", (gchar **)strv);
+}
+
 static GPtrArray *
 passim_cli_item_to_attrs(PassimItem *item)
 {
@@ -174,25 +192,29 @@ passim_cli_item_to_attrs(PassimItem *item)
 
 	if (passim_item_get_basename(item) != NULL) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Filename";
+		/* TRANSLATORS: item file basename */
+		attr->key = _("Filename");
 		attr->value = g_strdup(passim_item_get_basename(item));
 		g_ptr_array_add(array, attr);
 	}
 	if (passim_item_get_flags(item) != PASSIM_ITEM_FLAG_NONE) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Flags";
-		attr->value = passim_item_get_flags_as_string(item);
+		/* TRANSLATORS: item flags */
+		attr->key = _("Flags");
+		attr->value = passim_cli_item_flag_to_string(passim_item_get_flags(item));
 		g_ptr_array_add(array, attr);
 	}
 	if (passim_item_get_cmdline(item) != NULL) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Command Line";
+		/* TRANSLATORS: basename of the thing that published the item */
+		attr->key = _("Command Line");
 		attr->value = g_strdup(passim_item_get_cmdline(item));
 		g_ptr_array_add(array, attr);
 	}
 	if (passim_item_get_max_age(item) != G_MAXUINT32) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Age";
+		/* TRANSLATORS: age of the published item */
+		attr->key = _("Age");
 		attr->value = g_strdup_printf("%u/%u",
 					      passim_item_get_age(item),
 					      passim_item_get_max_age(item));
@@ -200,7 +222,8 @@ passim_cli_item_to_attrs(PassimItem *item)
 	}
 	if (passim_item_get_share_limit(item) != G_MAXUINT32) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Share Limit";
+		/* TRANSLATORS: number of times we can share the item */
+		attr->key = _("Share Limit");
 		attr->value = g_strdup_printf("%u/%u",
 					      passim_item_get_share_count(item),
 					      passim_item_get_share_limit(item));
@@ -208,33 +231,61 @@ passim_cli_item_to_attrs(PassimItem *item)
 	}
 	if (passim_item_get_size(item) != 0) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
-		attr->key = "Size";
+		/* TRANSLATORS: size of the published item */
+		attr->key = _("Size");
 		attr->value = g_format_size(passim_item_get_size(item));
 		g_ptr_array_add(array, attr);
 	}
 	return array;
 }
 
+static gchar *
+passim_cli_align_indent(const gchar *key, const gchar *value, guint indent)
+{
+	GString *str = g_string_new(key);
+	g_string_append_c(str, ':');
+	for (guint i = str->len; i < indent - 1; i++)
+		g_string_append_c(str, ' ');
+	g_string_append_c(str, ' ');
+	g_string_append(str, value);
+	return g_string_free(str, FALSE);
+}
+
+#define PASSIM_CLI_VALIGN 20
+
 static gboolean
 passim_cli_status(PassimCli *self, gchar **values, GError **error)
 {
 	PassimStatus status = passim_client_get_status(self->client);
+	const gchar *status_value;
+	g_autofree gchar *status_str = NULL;
 	g_autoptr(GPtrArray) items = NULL;
 
 	/* global status */
 	if (status == PASSIM_STATUS_STARTING || status == PASSIM_STATUS_LOADING) {
-		g_print("passimd is loading…\n");
+		/* TRANSLATORS: daemon is starting up */
+		status_value = _("Loading…");
 	} else if (status == PASSIM_STATUS_DISABLED_METERED) {
-		g_print("passimd is disabled as a metered network connection is detected\n");
+		/* TRANSLATORS: daemon is scared to publish files */
+		status_value = _("Disabled (metered network)");
 	} else if (status == PASSIM_STATUS_RUNNING) {
-		g_print("passimd is running\n");
+		/* TRANSLATORS: daemon is offering files like normal */
+		status_value = _("Running");
 	} else {
-		g_print("passimd status: %s\n", passim_status_to_string(status));
+		status_value = passim_status_to_string(status);
 	}
+	status_str = passim_cli_align_indent(_("Status"), status_value, PASSIM_CLI_VALIGN);
+	g_print("%s\n", status_str);
 
 	/* show location of the web console */
-	if (passim_client_get_uri(self->client) != NULL)
-		g_print("web console available at: %s\n", passim_client_get_uri(self->client));
+	if (passim_client_get_uri(self->client) != NULL) {
+		g_autofree gchar *uri_str =
+		    /* TRANSLATORS: full https://whatever of the daemon */
+		    passim_cli_align_indent(_("URI"),
+					    passim_client_get_uri(self->client),
+					    PASSIM_CLI_VALIGN);
+		g_print("%s\n", uri_str);
+	}
 
 	/* all items */
 	items = passim_client_get_items(self->client, error);
@@ -247,14 +298,9 @@ passim_cli_status(PassimCli *self, gchar **values, GError **error)
 		g_print("\n%s\n", passim_item_get_hash(item));
 		for (guint j = 0; j < attrs->len; j++) {
 			PassimItemAttr *attr = g_ptr_array_index(attrs, j);
-			g_autoptr(GString) key = g_string_new(attr->key);
-			g_string_append_c(key, ':');
-			for (guint k = key->len; k < 15; k++)
-				g_string_append_c(key, ' ');
-			g_print("%s %s %s\n",
-				j < attrs->len - 1 ? "├" : "└",
-				key->str,
-				attr->value);
+			g_autofree gchar *str =
+			    passim_cli_align_indent(attr->key, attr->value, PASSIM_CLI_VALIGN - 2);
+			g_print("%s %s\n", j < attrs->len - 1 ? "├" : "└", str);
 		}
 	}
 
@@ -273,7 +319,8 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 		g_set_error_literal(error,
 				    G_IO_ERROR,
 				    G_IO_ERROR_INVALID_ARGUMENT,
-				    "Invalid arguments");
+				    /* TRANSLATORS: user mistyped the command */
+				    _("Invalid arguments"));
 		return FALSE;
 	}
 	if (!passim_item_load_filename(item, values[0], error))
@@ -289,7 +336,8 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 
 	/* success */
 	str = passim_item_to_string(item);
-	g_print("Published: %s\n", str);
+	/* TRANSLATORS: now sharing to the world */
+	g_print("%s: %s\n", _("Published"), str);
 	return TRUE;
 }
 
@@ -301,14 +349,15 @@ passim_cli_unpublish(PassimCli *self, gchar **values, GError **error)
 		g_set_error_literal(error,
 				    G_IO_ERROR,
 				    G_IO_ERROR_INVALID_ARGUMENT,
-				    "Invalid arguments");
+				    /* TRANSLATORS: user mistyped the command */
+				    _("Invalid arguments"));
 		return FALSE;
 	}
 	if (!passim_client_unpublish(self->client, values[0], error))
 		return FALSE;
 
-	/* success */
-	g_print("Unpublished: %s\n", values[0]);
+	/* TRANSLATORS: no longer sharing with the world */
+	g_print("%s: %s\n", _("Unpublished"), values[0]);
 	return TRUE;
 }
 
@@ -322,9 +371,18 @@ main(int argc, char *argv[])
 	g_autoptr(GOptionContext) context = g_option_context_new(NULL);
 	g_autoptr(GPtrArray) cmd_array = passim_cli_cmd_array_new();
 	const GOptionEntry options[] = {
-	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
-	    {"next-reboot", '\0', 0, G_OPTION_ARG_NONE, &self->next_reboot, "Next reboot", NULL},
-	    {NULL}};
+	    /* TRANSLATORS: --version */
+	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, N_("Show project version"), NULL},
+	    /* TRANSLATORS: only begin sharing the item after the next restart */
+	    {"next-reboot",
+	     '\0',
+	     0,
+	     G_OPTION_ARG_NONE,
+	     &self->next_reboot,
+	     N_("Next reboot"),
+	     NULL},
+	    {NULL},
+	};
 
 	setlocale(LC_ALL, "");
 
@@ -335,41 +393,52 @@ main(int argc, char *argv[])
 	passim_cli_cmd_array_add(cmd_array,
 				 "status,dump",
 				 NULL,
-				 "Show daemon status",
+				 /* TRANSLATORS: CLI action description */
+				 _("Show daemon status"),
 				 passim_cli_status);
 	passim_cli_cmd_array_add(cmd_array,
 				 "publish",
-				 "FILENAME [MAX-AGE] [MAX-SHARE]",
-				 "Publish an additional file",
+				 /* TRANSLATORS: CLI option example */
+				 _("FILENAME [MAX-AGE] [MAX-SHARE]"),
+				 /* TRANSLATORS: CLI action description */
+				 _("Publish an additional file"),
 				 passim_cli_publish);
 	passim_cli_cmd_array_add(cmd_array,
 				 "unpublish",
-				 "HASH",
-				 "Unpublish an existing file",
+				 /* TRANSLATORS: CLI option example */
+				 _("HASH"),
+				 /* TRANSLATORS: CLI action description */
+				 _("Unpublish an existing file"),
 				 passim_cli_unpublish);
 	passim_cli_cmd_array_sort(cmd_array);
 
 	cmd_descriptions = passim_cli_cmd_array_to_string(cmd_array);
 	g_option_context_set_summary(context, cmd_descriptions);
-	g_option_context_set_description(context, "Interacting with the local passimd process.");
-	g_set_application_name("Passim CLI");
+	/* TRANSLATORS: CLI tool description */
+	g_option_context_set_description(context, _("Interact with the local passimd process."));
+	/* TRANSLATORS: CLI tool name */
+	g_set_application_name(_("Passim CLI"));
 	g_option_context_add_main_entries(context, options, NULL);
 	if (!g_option_context_parse(context, &argc, &argv, &error)) {
-		g_printerr("Failed to parse arguments: %s", error->message);
+		/* TRANSLATORS: we don't know what to do */
+		g_printerr("%s: %s", _("Failed to parse arguments"), error->message);
 		return EXIT_FAILURE;
 	}
 
 	/* connect to daemon */
 	self->client = passim_client_new();
 	if (!passim_client_load(self->client, &error)) {
-		g_printerr("Failed to connect to daemon: %s", error->message);
+		/* TRANSLATORS: daemon failed to start */
+		g_printerr("%s: %s", _("Failed to connect to daemon"), error->message);
 		return EXIT_FAILURE;
 	}
 
 	/* just show versions and exit */
 	if (version) {
-		g_print("client version: %s\n", VERSION);
-		g_print("daemon version: %s\n", passim_client_get_version(self->client));
+		/* TRANSLATORS: CLI tool */
+		g_print("%s: %s\n", _("client version"), VERSION);
+		/* TRANSLATORS: server */
+		g_print("%s: %s\n", _("daemon version"), passim_client_get_version(self->client));
 		return EXIT_SUCCESS;
 	}
 

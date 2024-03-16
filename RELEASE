@@ -6,6 +6,16 @@ git log --format="%s" --cherry-pick --right-only 0.1.5... | grep -i -v trivial |
 Add any user visible changes into ../data/org.freedesktop.Passim.metainfo.xml
 appstream-util appdata-to-news ../data/org.freedesktop.Passim.metainfo.xml > NEWS
 
+Update translations:
+
+ninja-build passim-pot
+cd ..
+tx push --source
+tx pull --all --force --minimum-perc=5
+cd build
+ninja-build fix-translations
+git add ../po/*.po
+
 # MAKE SURE THIS IS CORRECT
 export release_ver="0.1.6"
 
