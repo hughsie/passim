@@ -242,7 +242,7 @@ passim_client_input_stream_from_bytes(GBytes *bytes, GError **error)
 #endif
 
 #ifdef HAVE_MEMFD_CREATE
-	fd = memfd_create("fwupd", MFD_CLOEXEC);
+	fd = memfd_create("passim", MFD_CLOEXEC);
 #else
 	/* emulate in-memory file by an unlinked temporary file */
 	fd = g_mkstemp(tmp_file);
