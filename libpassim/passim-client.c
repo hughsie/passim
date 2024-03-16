@@ -28,6 +28,7 @@
 typedef struct {
 	GDBusProxy *proxy;
 	gchar *version;
+	gchar *uri;
 	PassimStatus status;
 } PassimClientPrivate;
 
@@ -50,6 +51,24 @@ passim_client_get_version(PassimClient *self)
 	PassimClientPrivate *priv = GET_PRIVATE(self);
 	g_return_val_if_fail(PASSIM_IS_CLIENT(self), NULL);
 	return priv->version;
+}
+
+/**
+ * passim_client_get_uri:
+ * @self: a #PassimClient
+ *
+ * Gets the daemon URI.
+ *
+ * Returns: the version string, or %NULL if unset
+ *
+ * Since: 0.1.6
+ **/
+const gchar *
+passim_client_get_uri(PassimClient *self)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_CLIENT(self), NULL);
+	return priv->uri;
 }
 
 /**
@@ -76,11 +95,17 @@ passim_client_load_proxy_properties(PassimClient *self)
 	PassimClientPrivate *priv = GET_PRIVATE(self);
 	g_autoptr(GVariant) status = NULL;
 	g_autoptr(GVariant) version = NULL;
+	g_autoptr(GVariant) uri = NULL;
 
 	version = g_dbus_proxy_get_cached_property(priv->proxy, "DaemonVersion");
 	if (version != NULL) {
 		g_free(priv->version);
 		priv->version = g_variant_dup_string(version, NULL);
+	}
+	uri = g_dbus_proxy_get_cached_property(priv->proxy, "Uri");
+	if (uri != NULL) {
+		g_free(priv->uri);
+		priv->uri = g_variant_dup_string(uri, NULL);
 	}
 	status = g_dbus_proxy_get_cached_property(priv->proxy, "Status");
 	if (status != NULL)
@@ -391,6 +416,7 @@ passim_client_finalize(GObject *object)
 	if (priv->proxy != NULL)
 		g_object_unref(priv->proxy);
 	g_free(priv->version);
+	g_free(priv->uri);
 
 	G_OBJECT_CLASS(passim_client_parent_class)->finalize(object);
 }

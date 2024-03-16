@@ -1218,6 +1218,10 @@ passim_server_get_property(GDBusConnection *connection_,
 		return g_variant_new_string(SOURCE_VERSION);
 	if (g_strcmp0(property_name, "Status") == 0)
 		return g_variant_new_uint32(self->status);
+	if (g_strcmp0(property_name, "Uri") == 0) {
+		g_autofree gchar *uri = g_strdup_printf("https://localhost:%u/", self->port);
+		return g_variant_new_string(uri);
+	}
 
 	/* return an error */
 	g_set_error(error,
