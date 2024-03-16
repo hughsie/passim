@@ -162,8 +162,61 @@ passim_cli_cmd_array_to_string(GPtrArray *array)
 	return g_string_free(string, FALSE);
 }
 
+typedef struct {
+	const gchar *key;
+	gchar *value;
+} PassimItemAttr;
+
+static GPtrArray *
+passim_cli_item_to_attrs(PassimItem *item)
+{
+	GPtrArray *array = g_ptr_array_new_with_free_func(g_free);
+
+	if (passim_item_get_basename(item) != NULL) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Filename";
+		attr->value = g_strdup(passim_item_get_basename(item));
+		g_ptr_array_add(array, attr);
+	}
+	if (passim_item_get_flags(item) != PASSIM_ITEM_FLAG_NONE) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Flags";
+		attr->value = passim_item_get_flags_as_string(item);
+		g_ptr_array_add(array, attr);
+	}
+	if (passim_item_get_cmdline(item) != NULL) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Command Line";
+		attr->value = g_strdup(passim_item_get_cmdline(item));
+		g_ptr_array_add(array, attr);
+	}
+	if (passim_item_get_max_age(item) != G_MAXUINT32) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Age";
+		attr->value = g_strdup_printf("%u/%u",
+					      passim_item_get_age(item),
+					      passim_item_get_max_age(item));
+		g_ptr_array_add(array, attr);
+	}
+	if (passim_item_get_share_limit(item) != G_MAXUINT32) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Share Limit";
+		attr->value = g_strdup_printf("%u/%u",
+					      passim_item_get_share_count(item),
+					      passim_item_get_share_limit(item));
+		g_ptr_array_add(array, attr);
+	}
+	if (passim_item_get_size(item) != 0) {
+		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
+		attr->key = "Size";
+		attr->value = g_format_size(passim_item_get_size(item));
+		g_ptr_array_add(array, attr);
+	}
+	return array;
+}
+
 static gboolean
-passim_cli_dump(PassimCli *self, gchar **values, GError **error)
+passim_cli_status(PassimCli *self, gchar **values, GError **error)
 {
 	PassimStatus status = passim_client_get_status(self->client);
 	g_autoptr(GPtrArray) items = NULL;
@@ -189,8 +242,20 @@ passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 		return FALSE;
 	for (guint i = 0; i < items->len; i++) {
 		PassimItem *item = g_ptr_array_index(items, i);
-		g_autofree gchar *str = passim_item_to_string(item);
-		g_print("%s\n", str);
+		g_autoptr(GPtrArray) attrs = passim_cli_item_to_attrs(item);
+
+		g_print("\n%s\n", passim_item_get_hash(item));
+		for (guint j = 0; j < attrs->len; j++) {
+			PassimItemAttr *attr = g_ptr_array_index(attrs, j);
+			g_autoptr(GString) key = g_string_new(attr->key);
+			g_string_append_c(key, ':');
+			for (guint k = key->len; k < 15; k++)
+				g_string_append_c(key, ' ');
+			g_print("%s %s %s\n",
+				j < attrs->len - 1 ? "├" : "└",
+				key->str,
+				attr->value);
+		}
 	}
 
 	/* success */
@@ -267,7 +332,11 @@ main(int argc, char *argv[])
 	bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 	textdomain(GETTEXT_PACKAGE);
 
-	passim_cli_cmd_array_add(cmd_array, "dump", NULL, "Dump files shared", passim_cli_dump);
+	passim_cli_cmd_array_add(cmd_array,
+				 "status,dump",
+				 NULL,
+				 "Show daemon status",
+				 passim_cli_status);
 	passim_cli_cmd_array_add(cmd_array,
 				 "publish",
 				 "FILENAME [MAX-AGE] [MAX-SHARE]",
