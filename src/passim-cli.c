@@ -179,6 +179,10 @@ passim_cli_dump(PassimCli *self, gchar **values, GError **error)
 		g_print("passimd status: %s\n", passim_status_to_string(status));
 	}
 
+	/* show location of the web console */
+	if (passim_client_get_uri(self->client) != NULL)
+		g_print("web console available at: %s\n", passim_client_get_uri(self->client));
+
 	/* all items */
 	items = passim_client_get_items(self->client, error);
 	if (items == NULL)

@@ -19,6 +19,15 @@
         </doc:description>
       </doc:doc>
     </property>
+    <property name='Uri' type='s' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The daemon web URI.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
     <property name='Status' type='u' access='read'>
       <doc:doc>
         <doc:description>

@@ -41,6 +41,8 @@ PassimClient *
 passim_client_new(void);
 const gchar *
 passim_client_get_version(PassimClient *self);
+const gchar *
+passim_client_get_uri(PassimClient *self);
 PassimStatus
 passim_client_get_status(PassimClient *self);
 gboolean
