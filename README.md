@@ -1,5 +1,7 @@
 # Passim
 
+[![Translation status](https://hosted.weblate.org/widget/passim/svg-badge.svg)](https://hosted.weblate.org/engage/passim/)
+
 A local caching server. Named after the Latin word for “here, there and everywhere”.
 
 ## Introduction
