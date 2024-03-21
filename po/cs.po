@@ -1,0 +1,160 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the passim package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: passim\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-03-19 15:36+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: cs\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. TRANSLATORS: the item is not enabled
+#: src/passim-cli.c:179
+msgid "Disabled"
+msgstr ""
+
+#. TRANSLATORS: only begin sharing the item after the next restart
+#: src/passim-cli.c:183
+msgid "Next Reboot"
+msgstr ""
+
+#. TRANSLATORS: item file basename
+#: src/passim-cli.c:196
+msgid "Filename"
+msgstr ""
+
+#. TRANSLATORS: item flags
+#: src/passim-cli.c:203
+msgid "Flags"
+msgstr ""
+
+#. TRANSLATORS: basename of the thing that published the item
+#: src/passim-cli.c:210
+msgid "Command Line"
+msgstr ""
+
+#. TRANSLATORS: age of the published item
+#: src/passim-cli.c:217
+msgid "Age"
+msgstr ""
+
+#. TRANSLATORS: number of times we can share the item
+#: src/passim-cli.c:226
+msgid "Share Limit"
+msgstr ""
+
+#. TRANSLATORS: size of the published item
+#: src/passim-cli.c:235
+msgid "Size"
+msgstr ""
+
+#. TRANSLATORS: daemon is starting up
+#: src/passim-cli.c:267
+msgid "Loading…"
+msgstr ""
+
+#. TRANSLATORS: daemon is scared to publish files
+#: src/passim-cli.c:270
+msgid "Disabled (metered network)"
+msgstr ""
+
+#. TRANSLATORS: daemon is offering files like normal
+#: src/passim-cli.c:273
+msgid "Running"
+msgstr ""
+
+#: src/passim-cli.c:277
+msgid "Status"
+msgstr ""
+
+#. TRANSLATORS: full https://whatever of the daemon
+#: src/passim-cli.c:284
+msgid "URI"
+msgstr ""
+
+#. TRANSLATORS: user mistyped the command
+#: src/passim-cli.c:323 src/passim-cli.c:353
+msgid "Invalid arguments"
+msgstr ""
+
+#. TRANSLATORS: now sharing to the world
+#: src/passim-cli.c:340
+msgid "Published"
+msgstr ""
+
+#. TRANSLATORS: no longer sharing with the world
+#: src/passim-cli.c:360
+msgid "Unpublished"
+msgstr ""
+
+#. TRANSLATORS: --version
+#: src/passim-cli.c:375
+msgid "Show project version"
+msgstr ""
+
+#: src/passim-cli.c:382
+msgid "Next reboot"
+msgstr ""
+
+#. TRANSLATORS: CLI action description
+#: src/passim-cli.c:397
+msgid "Show daemon status"
+msgstr ""
+
+#. TRANSLATORS: CLI option example
+#: src/passim-cli.c:402
+msgid "FILENAME [MAX-AGE] [MAX-SHARE]"
+msgstr ""
+
+#. TRANSLATORS: CLI action description
+#: src/passim-cli.c:404
+msgid "Publish an additional file"
+msgstr ""
+
+#. TRANSLATORS: CLI option example
+#: src/passim-cli.c:409
+msgid "HASH"
+msgstr ""
+
+#. TRANSLATORS: CLI action description
+#: src/passim-cli.c:411
+msgid "Unpublish an existing file"
+msgstr ""
+
+#. TRANSLATORS: CLI tool description
+#: src/passim-cli.c:418
+msgid "Interact with the local passimd process."
+msgstr ""
+
+#. TRANSLATORS: CLI tool name
+#: src/passim-cli.c:420
+msgid "Passim CLI"
+msgstr ""
+
+#. TRANSLATORS: we don't know what to do
+#: src/passim-cli.c:424
+msgid "Failed to parse arguments"
+msgstr ""
+
+#. TRANSLATORS: daemon failed to start
+#: src/passim-cli.c:432
+msgid "Failed to connect to daemon"
+msgstr ""
+
+#. TRANSLATORS: CLI tool
+#: src/passim-cli.c:439
+msgid "client version"
+msgstr ""
+
+#. TRANSLATORS: server
+#: src/passim-cli.c:441
+msgid "daemon version"
+msgstr ""
