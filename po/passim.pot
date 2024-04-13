@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: passim\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-03-19 15:36+0000\n"
+"POT-Creation-Date: 2024-04-14 18:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -58,104 +58,114 @@ msgid "Size"
 msgstr ""
 
 #. TRANSLATORS: daemon is starting up
-#: src/passim-cli.c:267
+#: src/passim-cli.c:269
 msgid "Loading…"
 msgstr ""
 
 #. TRANSLATORS: daemon is scared to publish files
-#: src/passim-cli.c:270
+#: src/passim-cli.c:272
 msgid "Disabled (metered network)"
 msgstr ""
 
 #. TRANSLATORS: daemon is offering files like normal
-#: src/passim-cli.c:273
+#: src/passim-cli.c:275
 msgid "Running"
 msgstr ""
 
-#: src/passim-cli.c:277
+#: src/passim-cli.c:279
 msgid "Status"
 msgstr ""
 
+#. TRANSLATORS: how many bytes we did not download from the internet
+#: src/passim-cli.c:287
+msgid "Network Saving"
+msgstr ""
+
+#. TRANSLATORS: how much carbon we did not *burn* by using local data
+#: src/passim-cli.c:294
+msgid "Carbon Saving"
+msgstr ""
+
 #. TRANSLATORS: full https://whatever of the daemon
-#: src/passim-cli.c:284
+#: src/passim-cli.c:302
 msgid "URI"
 msgstr ""
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:323 src/passim-cli.c:353
+#: src/passim-cli.c:341 src/passim-cli.c:371
 msgid "Invalid arguments"
 msgstr ""
 
 #. TRANSLATORS: now sharing to the world
-#: src/passim-cli.c:340
+#: src/passim-cli.c:358
 msgid "Published"
 msgstr ""
 
 #. TRANSLATORS: no longer sharing with the world
-#: src/passim-cli.c:360
+#: src/passim-cli.c:378
 msgid "Unpublished"
 msgstr ""
 
 #. TRANSLATORS: --version
-#: src/passim-cli.c:375
+#: src/passim-cli.c:393
 msgid "Show project version"
 msgstr ""
 
-#: src/passim-cli.c:382
+#: src/passim-cli.c:400
 msgid "Next reboot"
 msgstr ""
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:397
+#: src/passim-cli.c:415
 msgid "Show daemon status"
 msgstr ""
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:402
+#: src/passim-cli.c:420
 msgid "FILENAME [MAX-AGE] [MAX-SHARE]"
 msgstr ""
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:404
+#: src/passim-cli.c:422
 msgid "Publish an additional file"
 msgstr ""
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:409
+#: src/passim-cli.c:427
 msgid "HASH"
 msgstr ""
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:411
+#: src/passim-cli.c:429
 msgid "Unpublish an existing file"
 msgstr ""
 
 #. TRANSLATORS: CLI tool description
-#: src/passim-cli.c:418
+#: src/passim-cli.c:436
 msgid "Interact with the local passimd process."
 msgstr ""
 
 #. TRANSLATORS: CLI tool name
-#: src/passim-cli.c:420
+#: src/passim-cli.c:438
 msgid "Passim CLI"
 msgstr ""
 
 #. TRANSLATORS: we don't know what to do
-#: src/passim-cli.c:424
+#: src/passim-cli.c:442
 msgid "Failed to parse arguments"
 msgstr ""
 
 #. TRANSLATORS: daemon failed to start
-#: src/passim-cli.c:432
+#: src/passim-cli.c:450
 msgid "Failed to connect to daemon"
 msgstr ""
 
 #. TRANSLATORS: CLI tool
-#: src/passim-cli.c:439
+#: src/passim-cli.c:457
 msgid "client version"
 msgstr ""
 
 #. TRANSLATORS: server
-#: src/passim-cli.c:441
+#: src/passim-cli.c:459
 msgid "daemon version"
 msgstr ""

@@ -30,6 +30,8 @@ typedef struct {
 	gchar *version;
 	gchar *uri;
 	PassimStatus status;
+	guint64 download_saving;
+	gdouble carbon_saving;
 } PassimClientPrivate;
 
 G_DEFINE_TYPE_WITH_PRIVATE(PassimClient, passim_client, G_TYPE_OBJECT)
@@ -89,10 +91,48 @@ passim_client_get_status(PassimClient *self)
 	return priv->status;
 }
 
+/**
+ * passim_client_get_download_saving:
+ * @self: a #PassimClient
+ *
+ * Gets the total number of bytes saved from using this project.
+ *
+ * Returns: bytes
+ *
+ * Since: 0.1.6
+ **/
+guint64
+passim_client_get_download_saving(PassimClient *self)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_CLIENT(self), G_MAXUINT64);
+	return priv->download_saving;
+}
+
+/**
+ * passim_client_get_carbon_saving:
+ * @self: a #PassimClient
+ *
+ * Gets the carbon saving from using this project.
+ *
+ * Returns: kgs of CO₂e
+ *
+ * Since: 0.1.6
+ **/
+gdouble
+passim_client_get_carbon_saving(PassimClient *self)
+{
+	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_return_val_if_fail(PASSIM_IS_CLIENT(self), PASSIM_STATUS_UNKNOWN);
+	return priv->carbon_saving;
+}
+
 static void
 passim_client_load_proxy_properties(PassimClient *self)
 {
 	PassimClientPrivate *priv = GET_PRIVATE(self);
+	g_autoptr(GVariant) download_saving = NULL;
+	g_autoptr(GVariant) carbon_saving = NULL;
 	g_autoptr(GVariant) status = NULL;
 	g_autoptr(GVariant) version = NULL;
 	g_autoptr(GVariant) uri = NULL;
@@ -110,6 +150,12 @@ passim_client_load_proxy_properties(PassimClient *self)
 	status = g_dbus_proxy_get_cached_property(priv->proxy, "Status");
 	if (status != NULL)
 		priv->status = g_variant_get_uint32(status);
+	download_saving = g_dbus_proxy_get_cached_property(priv->proxy, "DownloadSaving");
+	if (download_saving != NULL)
+		priv->download_saving = g_variant_get_uint64(download_saving);
+	carbon_saving = g_dbus_proxy_get_cached_property(priv->proxy, "CarbonSaving");
+	if (carbon_saving != NULL)
+		priv->carbon_saving = g_variant_get_double(carbon_saving);
 }
 
 static void

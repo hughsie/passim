@@ -37,6 +37,24 @@
         </doc:description>
       </doc:doc>
     </property>
+    <property name='DownloadSaving' type='t' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The total number of bytes saved by using this project.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
+    <property name='CarbonSaving' type='d' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The carbon saving in kg CO₂e by using this project.
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
     <method name='GetItems'>
       <doc:doc>
         <doc:description>

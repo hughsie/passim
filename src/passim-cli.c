@@ -258,6 +258,8 @@ passim_cli_status(PassimCli *self, gchar **values, GError **error)
 {
 	PassimStatus status = passim_client_get_status(self->client);
 	const gchar *status_value;
+	gdouble download_saving = passim_client_get_download_saving(self->client);
+	gdouble carbon_saving = passim_client_get_carbon_saving(self->client);
 	g_autofree gchar *status_str = NULL;
 	g_autoptr(GPtrArray) items = NULL;
 
@@ -276,6 +278,22 @@ passim_cli_status(PassimCli *self, gchar **values, GError **error)
 	}
 	status_str = passim_cli_align_indent(_("Status"), status_value, PASSIM_CLI_VALIGN);
 	g_print("%s\n", status_str);
+
+	/* this is important enough to show */
+	if (download_saving > 0) {
+		g_autofree gchar *download_value = g_format_size(download_saving);
+		g_autofree gchar *download_str =
+		    /* TRANSLATORS: how many bytes we did not download from the internet */
+		    passim_cli_align_indent(_("Network Saving"), download_value, PASSIM_CLI_VALIGN);
+		g_print("%s\n", download_str);
+	}
+	if (carbon_saving > 0.001) {
+		g_autofree gchar *carbon_value = g_strdup_printf("%.02lf kg CO₂e", carbon_saving);
+		g_autofree gchar *carbon_str =
+		    /* TRANSLATORS: how much carbon we did not *burn* by using local data */
+		    passim_cli_align_indent(_("Carbon Saving"), carbon_value, PASSIM_CLI_VALIGN);
+		g_print("%s\n", carbon_str);
+	}
 
 	/* show location of the web console */
 	if (passim_client_get_uri(self->client) != NULL) {
