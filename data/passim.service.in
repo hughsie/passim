@@ -31,3 +31,4 @@ SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
 StateDirectory=passim passim/data
+LogsDirectory=passim

@@ -165,6 +165,61 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 }
 
 static gboolean
+passim_server_eventlog(PassimServer *self, const gchar *type, const gchar *value, GError **error)
+{
+	const gchar *logs_directory = g_getenv("LOGS_DIRECTORY");
+	g_autofree gchar *filename = NULL;
+	g_autofree gchar *line = NULL;
+	g_autofree gchar *path = NULL;
+	g_autofree gchar *ts_iso8601 = NULL;
+	g_autoptr(GDateTime) dt = g_date_time_new_now_utc();
+	g_autoptr(GFile) file = NULL;
+	g_autoptr(GFileOutputStream) ostream = NULL;
+
+	/* create logdir */
+	if (logs_directory == NULL) {
+		path = g_build_filename(PACKAGE_LOCALSTATEDIR, "log", PACKAGE_NAME, NULL);
+	} else {
+		path = g_strdup(logs_directory);
+	}
+	if (!passim_mkdir(path, error))
+		return FALSE;
+
+	/* open file */
+	filename = g_build_filename(path, "audit.log", NULL);
+	file = g_file_new_for_path(filename);
+	ostream = g_file_append_to(file, G_FILE_CREATE_PRIVATE, NULL, error);
+	if (ostream == NULL)
+		return FALSE;
+
+	/* create line */
+	ts_iso8601 = g_date_time_format_iso8601(dt);
+	line = g_strdup_printf("%s %s %s\n", ts_iso8601, type, value);
+	return g_output_stream_write_all(G_OUTPUT_STREAM(ostream),
+					 line,
+					 strlen(line),
+					 NULL,
+					 NULL,
+					 error);
+}
+
+static void
+passim_server_append_str(GString *str, const gchar *key, const gchar *value)
+{
+	if (str->len > 0)
+		g_string_append_c(str, ',');
+	g_string_append_printf(str, "%s=%s", key, value);
+}
+
+static void
+passim_server_append_u64(GString *str, const gchar *key, guint64 value)
+{
+	if (str->len > 0)
+		g_string_append_c(str, ',');
+	g_string_append_printf(str, "%s=%u", key, (guint)value);
+}
+
+static gboolean
 passim_server_add_item(PassimServer *self, PassimItem *item, GError **error)
 {
 	g_debug("added https://localhost:%u/%s?sha256=%s",
@@ -666,6 +721,7 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 static gboolean
 passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 {
+	g_autoptr(GString) event_msg = g_string_new(NULL);
 	if (!g_file_delete(passim_item_get_file(item), NULL, error)) {
 		g_prefix_error(error, "failed to delete %s: ", passim_item_get_hash(item));
 		return FALSE;
@@ -675,7 +731,11 @@ passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 		g_prefix_error(error, "failed to register: ");
 		return FALSE;
 	}
-	return TRUE;
+
+	/* success */
+	passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
+	passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
+	return passim_server_eventlog(self, "DELTE", event_msg->str, error);
 }
 
 static void
@@ -834,11 +894,21 @@ passim_server_handler_cb(SoupServer *server,
 	/* already exists locally */
 	item = g_hash_table_lookup(self->items, hash);
 	if (item != NULL) {
+		g_autoptr(GError) error = NULL;
+		g_autoptr(GString) event_msg = g_string_new(NULL);
 		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED)) {
 			passim_server_msg_send_error(self, msg, SOUP_STATUS_LOCKED, NULL);
 			return;
 		}
 		passim_server_msg_send_item(self, msg, item);
+
+		/* log */
+		passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
+		passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
+		passim_server_append_u64(event_msg, "size", passim_item_get_size(item));
+		passim_server_append_str(event_msg, "ipaddr", inet_addrstr);
+		if (!passim_server_eventlog(self, "SHARE", event_msg->str, &error))
+			g_warning("failed to log: %s", error->message);
 		return;
 	}
 
@@ -871,6 +941,7 @@ passim_server_publish_file(PassimServer *self, GBytes *blob, PassimItem *item, G
 	g_autofree gchar *localstate_dir = NULL;
 	g_autofree gchar *localstate_filename = NULL;
 	g_autofree gchar *hashed_filename = NULL;
+	g_autoptr(GString) event_msg = g_string_new(NULL);
 	g_autoptr(GFile) file = NULL;
 
 	hash = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, blob);
@@ -930,9 +1001,15 @@ passim_server_publish_file(PassimServer *self, GBytes *blob, PassimItem *item, G
 	passim_item_set_file(item, file);
 	g_debug("added %s", localstate_filename);
 	g_hash_table_insert(self->items, g_steal_pointer(&hash), g_object_ref(item));
+	if (!passim_server_avahi_register(self, error))
+		return FALSE;
 
 	/* success */
-	return passim_server_avahi_register(self, error);
+	passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
+	passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
+	passim_server_append_u64(event_msg, "size", passim_item_get_size(item));
+	passim_server_append_str(event_msg, "cmdline", passim_item_get_cmdline(item));
+	return passim_server_eventlog(self, "PBLSH", event_msg->str, error);
 }
 
 static gboolean
