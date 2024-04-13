@@ -16,6 +16,8 @@ guint16
 passim_config_get_port(GKeyFile *kf);
 gsize
 passim_config_get_max_item_size(GKeyFile *kf);
+gdouble
+passim_config_get_carbon_cost(GKeyFile *kf);
 gchar *
 passim_config_get_path(GKeyFile *kf);
 gboolean

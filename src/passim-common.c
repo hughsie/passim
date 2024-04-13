@@ -14,6 +14,7 @@
 #define PASSIM_CONFIG_PORT	    "Port"
 #define PASSIM_CONFIG_PATH	    "Path"
 #define PASSIM_CONFIG_MAX_ITEM_SIZE "MaxItemSize"
+#define PASSIM_CONFIG_CARBON_COST   "CarbonCost"
 
 const gchar *
 passim_status_to_string(PassimStatus status)
@@ -69,6 +70,21 @@ gsize
 passim_config_get_max_item_size(GKeyFile *kf)
 {
 	return g_key_file_get_uint64(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL);
+}
+
+gdouble
+passim_config_get_carbon_cost(GKeyFile *kf)
+{
+	gdouble carbon_cost =
+	    g_key_file_get_double(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_CARBON_COST, NULL);
+	if (carbon_cost < 0.00001) {
+		/* using
+		 * https://www.carbonbrief.org/factcheck-what-is-the-carbon-footprint-of-streaming-video-on-netflix/
+		 * we can see that 0.018 kg CO2e for 30 mins, where 3 GB/hr -- so this gives a
+		 * kg/GB of ~0.018 kg x (3h / 2) */
+		carbon_cost = 0.026367;
+	}
+	return carbon_cost;
 }
 
 gchar *

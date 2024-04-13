@@ -33,6 +33,7 @@ typedef struct {
 	guint owner_id;
 	guint poll_item_age_id;
 	guint timed_exit_id;
+	guint64 download_saving;
 	PassimStatus status;
 } PassimServer;
 
@@ -164,10 +165,88 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 	return TRUE;
 }
 
+static gchar *
+passim_server_get_logdir(void)
+{
+	const gchar *logs_directory = g_getenv("LOGS_DIRECTORY");
+	if (logs_directory != NULL)
+		return g_strdup(logs_directory);
+	return g_build_filename(PACKAGE_LOCALSTATEDIR, "log", PACKAGE_NAME, NULL);
+}
+
+static gboolean
+passim_server_update_download_saving_arg(PassimServer *self, const gchar *arg, GError **error)
+{
+	g_auto(GStrv) kvs = g_strsplit(arg, "=", -1);
+	if (g_strcmp0(kvs[0], "size") == 0) {
+		guint64 value = g_ascii_strtoull(kvs[1], NULL, 10);
+		if (value != G_MAXUINT64 && value != 0)
+			self->download_saving += value;
+	}
+	return TRUE;
+}
+
+static gboolean
+passim_server_update_download_saving_args(PassimServer *self, const gchar *args, GError **error)
+{
+	g_auto(GStrv) sections = g_strsplit(args, ",", -1);
+	for (guint i = 0; sections[i] != NULL; i++) {
+		if (!passim_server_update_download_saving_arg(self, sections[i], error))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static gboolean
+passim_server_update_download_saving(PassimServer *self, GError **error)
+{
+	g_autofree gchar *filename = NULL;
+	g_autofree gchar *path = NULL;
+	g_autoptr(GDataInputStream) dstream = NULL;
+	g_autoptr(GError) error_local = NULL;
+	g_autoptr(GFile) file = NULL;
+	g_autoptr(GFileInputStream) istream = NULL;
+
+	/* open file for reading */
+	path = passim_server_get_logdir();
+	filename = g_build_filename(path, "audit.log", NULL);
+	file = g_file_new_for_path(filename);
+	istream = g_file_read(file, NULL, &error_local);
+	if (istream == NULL) {
+		if (g_error_matches(error_local, G_IO_ERROR, G_IO_ERROR_NOT_FOUND))
+			return TRUE;
+		g_propagate_error(error, g_steal_pointer(&error_local));
+		return FALSE;
+	}
+	dstream = g_data_input_stream_new(G_INPUT_STREAM(istream));
+
+	/* read each line */
+	do {
+		g_autofree gchar *str = NULL;
+		g_autoptr(GError) error_line = NULL;
+		g_auto(GStrv) sections = NULL;
+
+		str = g_data_input_stream_read_line_utf8(dstream, NULL, NULL, &error_line);
+		if (str == NULL && error_line != NULL) {
+			g_propagate_error(error, g_steal_pointer(&error_line));
+			return FALSE;
+		}
+		if (str == NULL)
+			break;
+		sections = g_strsplit(str, " ", -1);
+		if (g_strv_length(sections) >= 3 && g_strcmp0(sections[1], "SHARE") == 0) {
+			if (!passim_server_update_download_saving_args(self, sections[2], error))
+				return FALSE;
+		}
+	} while (1);
+
+	/* success */
+	return TRUE;
+}
+
 static gboolean
 passim_server_eventlog(PassimServer *self, const gchar *type, const gchar *value, GError **error)
 {
-	const gchar *logs_directory = g_getenv("LOGS_DIRECTORY");
 	g_autofree gchar *filename = NULL;
 	g_autofree gchar *line = NULL;
 	g_autofree gchar *path = NULL;
@@ -177,11 +256,7 @@ passim_server_eventlog(PassimServer *self, const gchar *type, const gchar *value
 	g_autoptr(GFileOutputStream) ostream = NULL;
 
 	/* create logdir */
-	if (logs_directory == NULL) {
-		path = g_build_filename(PACKAGE_LOCALSTATEDIR, "log", PACKAGE_NAME, NULL);
-	} else {
-		path = g_strdup(logs_directory);
-	}
+	path = passim_server_get_logdir();
 	if (!passim_mkdir(path, error))
 		return FALSE;
 
@@ -902,6 +977,9 @@ passim_server_handler_cb(SoupServer *server,
 		}
 		passim_server_msg_send_item(self, msg, item);
 
+		/* update counter */
+		self->download_saving += passim_item_get_size(item);
+
 		/* log */
 		passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
 		passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
@@ -1280,6 +1358,15 @@ passim_server_method_call(GDBusConnection *connection,
 					      method_name);
 }
 
+static gdouble
+passim_server_get_carbon_saving(PassimServer *self)
+{
+	gdouble val = self->download_saving;
+	/* convert both to MB */
+	val *= passim_config_get_carbon_cost(self->kf) / 1024;
+	return val / 0x100000L;
+}
+
 static GVariant *
 passim_server_get_property(GDBusConnection *connection_,
 			   const gchar *sender,
@@ -1295,6 +1382,10 @@ passim_server_get_property(GDBusConnection *connection_,
 		return g_variant_new_string(SOURCE_VERSION);
 	if (g_strcmp0(property_name, "Status") == 0)
 		return g_variant_new_uint32(self->status);
+	if (g_strcmp0(property_name, "DownloadSaving") == 0)
+		return g_variant_new_uint64(self->download_saving);
+	if (g_strcmp0(property_name, "CarbonSaving") == 0)
+		return g_variant_new_double(passim_server_get_carbon_saving(self));
 	if (g_strcmp0(property_name, "Uri") == 0) {
 		g_autofree gchar *uri = g_strdup_printf("https://localhost:%u/", self->port);
 		return g_variant_new_string(uri);
@@ -1568,6 +1659,12 @@ main(int argc, char *argv[])
 		g_info("listening on %s", str);
 	}
 	self->status = PASSIM_STATUS_LOADING;
+
+	/* update total shared so far */
+	if (!passim_server_update_download_saving(self, &error)) {
+		g_warning("failed to read log: %s", error->message);
+		return 1;
+	}
 
 	/* register objects with Avahi */
 	if (!passim_server_avahi_register(self, &error)) {

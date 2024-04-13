@@ -63,6 +63,8 @@ LIBPASSIM_0.1.5 {
 
 LIBPASSIM_0.1.6 {
   global:
+    passim_client_get_carbon_saving;
+    passim_client_get_download_saving;
     passim_client_get_uri;
   local: *;
 } LIBPASSIM_0.1.5;

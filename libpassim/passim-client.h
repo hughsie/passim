@@ -45,6 +45,10 @@ const gchar *
 passim_client_get_uri(PassimClient *self);
 PassimStatus
 passim_client_get_status(PassimClient *self);
+guint64
+passim_client_get_download_saving(PassimClient *self);
+gdouble
+passim_client_get_carbon_saving(PassimClient *self);
 gboolean
 passim_client_load(PassimClient *self, GError **error);
 GPtrArray *
