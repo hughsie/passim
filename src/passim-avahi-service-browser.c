@@ -196,6 +196,7 @@ passim_avahi_service_browser_prepare_cb(GObject *source, GAsyncResult *res, gpoi
 void
 passim_avahi_service_browser_async(GDBusProxy *proxy,
 				   const gchar *hash,
+				   AvahiProtocol protocol,
 				   GCancellable *cancellable,
 				   GAsyncReadyCallback callback,
 				   gpointer callback_data)
@@ -216,7 +217,7 @@ passim_avahi_service_browser_async(GDBusProxy *proxy,
 			  "ServiceBrowserPrepare",
 			  g_variant_new("(iissu)",
 					AVAHI_IF_UNSPEC,
-					AVAHI_PROTO_UNSPEC,
+					protocol,
 					subtype,
 					PASSIM_SERVER_DOMAIN,
 					0), /* flags */

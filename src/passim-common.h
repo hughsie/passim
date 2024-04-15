@@ -14,6 +14,8 @@ GKeyFile *
 passim_config_load(GError **error);
 guint16
 passim_config_get_port(GKeyFile *kf);
+gboolean
+passim_config_get_ipv6(GKeyFile *kf);
 gsize
 passim_config_get_max_item_size(GKeyFile *kf);
 gdouble

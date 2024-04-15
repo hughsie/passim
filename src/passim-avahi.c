@@ -111,7 +111,10 @@ passim_avahi_connect(PassimAvahi *self, GError **error)
 }
 
 static gboolean
-passim_avahi_register_subtype(PassimAvahi *self, const gchar *hash, GError **error)
+passim_avahi_register_subtype(PassimAvahi *self,
+			      const gchar *hash,
+			      AvahiProtocol protocol,
+			      GError **error)
 {
 	g_autofree gchar *subtype = passim_avahi_build_subtype_for_hash(hash);
 	g_autoptr(GVariant) val = NULL;
@@ -121,7 +124,7 @@ passim_avahi_register_subtype(PassimAvahi *self, const gchar *hash, GError **err
 				     "AddServiceSubtype",
 				     g_variant_new("(iiussss)",
 						   AVAHI_IF_UNSPEC,
-						   AVAHI_PROTO_UNSPEC,
+						   protocol,
 						   0 /* flags */,
 						   self->name,
 						   PASSIM_SERVER_TYPE,
@@ -165,7 +168,7 @@ passim_avahi_unregister(PassimAvahi *self, GError **error)
 }
 
 gboolean
-passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
+passim_avahi_register(PassimAvahi *self, gchar **keys, AvahiProtocol protocol, GError **error)
 {
 	g_autoptr(GVariant) val2 = NULL;
 	g_autoptr(GVariant) val4 = NULL;
@@ -181,7 +184,7 @@ passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
 				      "AddService",
 				      g_variant_new("(iiussssqaay)",
 						    AVAHI_IF_UNSPEC,
-						    AVAHI_PROTO_UNSPEC,
+						    protocol,
 						    0 /* flags */,
 						    self->name,
 						    PASSIM_SERVER_TYPE,
@@ -198,7 +201,7 @@ passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error)
 		return FALSE;
 	}
 	for (guint i = 0; keys[i] != NULL; i++) {
-		if (!passim_avahi_register_subtype(self, keys[i], error))
+		if (!passim_avahi_register_subtype(self, keys[i], protocol, error))
 			return FALSE;
 	}
 	val4 = g_dbus_proxy_call_sync(self->proxy_eg,
@@ -333,6 +336,7 @@ passim_avahi_service_browser_cb(GObject *source, GAsyncResult *res, gpointer use
 void
 passim_avahi_find_async(PassimAvahi *self,
 			const gchar *hash,
+			AvahiProtocol protocol,
 			GCancellable *cancellable,
 			GAsyncReadyCallback callback,
 			gpointer callback_data)
@@ -355,6 +359,7 @@ passim_avahi_find_async(PassimAvahi *self,
 			     (GDestroyNotify)passim_avahi_find_helper_free);
 	passim_avahi_service_browser_async(self->proxy,
 					   truncated_hash,
+					   protocol,
 					   cancellable,
 					   passim_avahi_service_browser_cb,
 					   g_steal_pointer(&task));
