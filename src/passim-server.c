@@ -598,6 +598,7 @@ typedef struct {
 	SoupServerMessage *msg;
 	gchar *hash;
 	gchar *basename;
+	gboolean allow_localhost;
 } PassimServerContext;
 
 static void
@@ -884,6 +885,7 @@ passim_server_handler_cb(SoupServer *server,
 	GSocketAddress *socket_addr;
 	PassimItem *item;
 	GUri *uri = soup_server_message_get_uri(msg);
+	gboolean allow_localhost = TRUE;
 	gboolean is_loopback;
 	g_autofree gchar *hash = NULL;
 	g_autofree gchar *inet_addrstr = NULL;
@@ -948,7 +950,23 @@ passim_server_handler_cb(SoupServer *server,
 			continue;
 		if (g_strcmp0(kv[0], "sha256") == 0) {
 			hash = g_strdup(kv[1]);
-			break;
+			continue;
+		}
+		if (g_strcmp0(kv[0], "localhost") == 0) {
+			if (g_strcmp0(kv[1], "true") == 0) {
+				allow_localhost = TRUE;
+				continue;
+			}
+			if (g_strcmp0(kv[1], "false") == 0) {
+				allow_localhost = FALSE;
+				continue;
+			}
+			passim_server_msg_send_error(
+			    self,
+			    msg,
+			    SOUP_STATUS_BAD_REQUEST,
+			    "localhost option invalid, expected true|false");
+			return;
 		}
 	}
 	if (hash == NULL) {
@@ -968,7 +986,7 @@ passim_server_handler_cb(SoupServer *server,
 
 	/* already exists locally */
 	item = g_hash_table_lookup(self->items, hash);
-	if (item != NULL) {
+	if (item != NULL && allow_localhost) {
 		g_autoptr(GError) error = NULL;
 		g_autoptr(GString) event_msg = g_string_new(NULL);
 		if (passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED)) {
@@ -998,6 +1016,7 @@ passim_server_handler_cb(SoupServer *server,
 
 	/* create context */
 	ctx->self = self;
+	ctx->allow_localhost = allow_localhost;
 	ctx->msg = g_object_ref(msg);
 	ctx->hash = g_strdup(hash);
 	ctx->basename = g_strdup(request[0]);
