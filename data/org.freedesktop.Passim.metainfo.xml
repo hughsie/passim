@@ -20,6 +20,25 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.6" date="2024-04-15">
+      <description>
+        <p>
+          This release adds the following features:
+        </p>
+        <ul>
+          <li>Add a 'download' command to the CLI, and allow ignoring the localhost scan</li>
+          <li>Log to an audit log when publishing, unpublishing and sharing</li>
+          <li>Show the URI, auto-generated name, network and carbon saving in the CLI</li>
+        </ul>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Add translation support for the CLI tool</li>
+          <li>Properly encode socket addresses, but disable IPv6 by default</li>
+          <li>Redirect with the basename set correctly</li>
+          <li>Reduce some log-spam when checking item ages</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.5" date="2024-01-02">
       <description>
         <p>This release adds some new API for fwupd to use.</p>
