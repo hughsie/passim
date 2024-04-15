@@ -46,6 +46,7 @@ executable(
   ],
   dependencies: [
     libgio,
+    libsoup,
   ],
   link_with: [
     passim,
