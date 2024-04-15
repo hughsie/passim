@@ -30,6 +30,7 @@ typedef struct {
 	GNetworkMonitor *network_monitor;
 	gchar *root;
 	guint16 port;
+	gboolean use_ipv6;
 	guint owner_id;
 	guint poll_item_age_id;
 	guint timed_exit_id;
@@ -157,7 +158,10 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 			continue;
 		keys[keyidx++] = passim_item_get_hash(item);
 	}
-	if (!passim_avahi_register(self->avahi, (gchar **)keys, error))
+	if (!passim_avahi_register(self->avahi,
+				   (gchar **)keys,
+				   self->use_ipv6 ? AVAHI_PROTO_UNSPEC : AVAHI_PROTO_INET,
+				   error))
 		return FALSE;
 
 	/* success */
@@ -1026,6 +1030,7 @@ passim_server_handler_cb(SoupServer *server,
 	soup_server_message_pause(msg);
 	passim_avahi_find_async(self->avahi,
 				hash,
+				self->use_ipv6 ? AVAHI_PROTO_UNSPEC : AVAHI_PROTO_INET,
 				NULL,
 				passim_server_avahi_find_cb,
 				g_steal_pointer(&ctx));
@@ -1629,6 +1634,7 @@ main(int argc, char *argv[])
 		self->timed_exit_id = g_timeout_add_seconds(10, passim_server_timed_exit_cb, self);
 	self->avahi = passim_avahi_new(self->kf);
 	self->port = passim_config_get_port(self->kf);
+	self->use_ipv6 = passim_config_get_ipv6(self->kf);
 	self->root = passim_config_get_path(self->kf);
 	self->items =
 	    g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_object_unref);
@@ -1667,7 +1673,12 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	soup_server = soup_server_new("server-header", "passim ", "tls-certificate", cert, NULL);
-	if (!soup_server_listen_all(soup_server, self->port, SOUP_SERVER_LISTEN_HTTPS, &error)) {
+	if (!soup_server_listen_all(soup_server,
+				    self->port,
+				    self->use_ipv6
+					? SOUP_SERVER_LISTEN_HTTPS
+					: SOUP_SERVER_LISTEN_HTTPS | SOUP_SERVER_LISTEN_IPV4_ONLY,
+				    &error)) {
 		g_printerr("%s: %s\n", argv[0], error->message);
 		return 1;
 	}

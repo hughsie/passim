@@ -12,6 +12,7 @@
 
 #define PASSIM_CONFIG_GROUP	    "daemon"
 #define PASSIM_CONFIG_PORT	    "Port"
+#define PASSIM_CONFIG_IPV6	    "IPv6"
 #define PASSIM_CONFIG_PATH	    "Path"
 #define PASSIM_CONFIG_MAX_ITEM_SIZE "MaxItemSize"
 #define PASSIM_CONFIG_CARBON_COST   "CarbonCost"
@@ -64,6 +65,12 @@ guint16
 passim_config_get_port(GKeyFile *kf)
 {
 	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL);
+}
+
+gboolean
+passim_config_get_ipv6(GKeyFile *kf)
+{
+	return g_key_file_get_boolean(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_IPV6, NULL);
 }
 
 gsize

@@ -8,9 +8,12 @@
 
 #include <gio/gio.h>
 
+#include "passim-avahi.h"
+
 void
 passim_avahi_service_browser_async(GDBusProxy *proxy,
 				   const gchar *hash,
+				   AvahiProtocol protocol,
 				   GCancellable *cancellable,
 				   GAsyncReadyCallback callback,
 				   gpointer callback_data);

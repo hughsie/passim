@@ -286,7 +286,7 @@ passim_avahi_service_resolver_async(GDBusProxy *proxy,
 					service->name,
 					service->type,
 					service->domain,
-					AVAHI_PROTO_UNSPEC,
+					service->protocol,
 					0), /* flags */
 			  G_DBUS_CALL_FLAGS_NONE,
 			  PASSIM_SERVER_TIMEOUT,

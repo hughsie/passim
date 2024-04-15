@@ -11,10 +11,13 @@
 #define PASSIM_TYPE_AVAHI (passim_avahi_get_type())
 G_DECLARE_FINAL_TYPE(PassimAvahi, passim_avahi, PASSIM, AVAHI, GObject)
 
-#define AVAHI_IF_UNSPEC	   -1
-#define AVAHI_PROTO_UNSPEC -1
-#define AVAHI_PROTO_INET   0 /* IPv4 */
-#define AVAHI_PROTO_INET6  1 /* IPv6 */
+#define AVAHI_IF_UNSPEC -1
+
+typedef enum {
+	AVAHI_PROTO_INET = 0,  /* IPv4 */
+	AVAHI_PROTO_INET6 = 1, /* IPv6 */
+	AVAHI_PROTO_UNSPEC = -1,
+} AvahiProtocol;
 
 typedef enum {
 	AVAHI_LOOKUP_USE_WIDE_AREA = 1,
@@ -44,7 +47,7 @@ passim_avahi_connect(PassimAvahi *self, GError **error);
 gboolean
 passim_avahi_unregister(PassimAvahi *self, GError **error);
 gboolean
-passim_avahi_register(PassimAvahi *self, gchar **keys, GError **error);
+passim_avahi_register(PassimAvahi *self, gchar **keys, AvahiProtocol protocol, GError **error);
 const gchar *
 passim_avahi_get_name(PassimAvahi *self);
 gchar *
@@ -53,6 +56,7 @@ passim_avahi_build_subtype_for_hash(const gchar *hash);
 void
 passim_avahi_find_async(PassimAvahi *self,
 			const gchar *hash,
+			AvahiProtocol protocol,
 			GCancellable *cancellable,
 			GAsyncReadyCallback callback,
 			gpointer callback_data);
