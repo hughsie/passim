@@ -9,6 +9,7 @@ appstream-util appdata-to-news ../data/org.freedesktop.Passim.metainfo.xml > NEW
 Update translations:
 
 ninja-build passim-pot
+git commit -a -m "trivial: Update translations for Weblate"
 
 # MAKE SURE THIS IS CORRECT
 export release_ver="0.1.6"
