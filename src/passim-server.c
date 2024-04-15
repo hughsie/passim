@@ -1023,7 +1023,7 @@ passim_server_handler_cb(SoupServer *server,
 	ctx->allow_localhost = allow_localhost;
 	ctx->msg = g_object_ref(msg);
 	ctx->hash = g_strdup(hash);
-	ctx->basename = g_strdup(request[0]);
+	ctx->basename = g_path_get_basename(path);
 
 	/* look for remote servers with this hash */
 	g_info("searching for %s", hash);
