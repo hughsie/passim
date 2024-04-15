@@ -8,6 +8,7 @@
 
 #include <glib/gi18n.h>
 #include <libintl.h>
+#include <libsoup/soup.h>
 #include <locale.h>
 #include <passim.h>
 
@@ -379,6 +380,121 @@ passim_cli_unpublish(PassimCli *self, gchar **values, GError **error)
 	return TRUE;
 }
 
+static gboolean
+passim_cli_accept_certificate_cb(SoupMessage *self,
+				 GTlsCertificate *tls_peer_certificate,
+				 GTlsCertificateFlags tls_peer_errors,
+				 gpointer user_data)
+{
+	/* ignore self-signed certificate */
+	return TRUE;
+}
+
+static gboolean
+passim_cli_download(PassimCli *self, gchar **values, GError **error)
+{
+	GInetAddress *inet_addr;
+	GSocketAddress *socket_addr;
+	SoupMessageHeaders *response_headers;
+	SoupStatus status;
+	const gchar *content_type;
+	g_autofree gchar *checksum = NULL;
+	g_autofree gchar *inet_addrstr = NULL;
+	g_autofree gchar *remote_addr = NULL;
+	g_autofree gchar *size = NULL;
+	g_autofree gchar *uri = NULL;
+	g_autofree gchar *user_agent = NULL;
+	g_autoptr(GBytes) bytes = NULL;
+	g_autoptr(SoupMessage) msg = NULL;
+	g_autoptr(SoupSession) session = soup_session_new();
+
+	/* parse args */
+	if (g_strv_length(values) != 2) {
+		g_set_error_literal(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_INVALID_ARGUMENT,
+				    /* TRANSLATORS: user mistyped the command */
+				    _("Invalid arguments, expected BASENAME HASH"));
+		return FALSE;
+	}
+
+	/* download file */
+	user_agent = g_strdup_printf("%s/%s", PACKAGE_NAME, VERSION);
+	soup_session_set_user_agent(session, user_agent);
+	soup_session_set_timeout(session, 30);
+	uri = g_strdup_printf("%s%s?sha256=%s&localhost=false",
+			      passim_client_get_uri(self->client),
+			      values[0],
+			      values[1]);
+	msg = soup_message_new(SOUP_METHOD_GET, uri);
+	g_signal_connect(msg,
+			 "accept-certificate",
+			 G_CALLBACK(passim_cli_accept_certificate_cb),
+			 self);
+	bytes = soup_session_send_and_read(session, msg, NULL, error);
+	if (bytes == NULL)
+		return FALSE;
+
+	/* get the host that provided the transfer */
+	socket_addr = soup_message_get_remote_address(msg);
+	inet_addr = g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(socket_addr));
+	inet_addrstr = g_inet_address_to_string(inet_addr);
+	remote_addr =
+	    g_strdup_printf("%s:%u",
+			    inet_addrstr,
+			    g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(socket_addr)));
+
+	/* verify error code */
+	status = soup_message_get_status(msg);
+	if (!SOUP_STATUS_IS_SUCCESSFUL(status)) {
+		if (g_utf8_validate((const gchar *)g_bytes_get_data(bytes, NULL),
+				    g_bytes_get_size(bytes),
+				    NULL)) {
+			g_debug("%s", (const gchar *)g_bytes_get_data(bytes, NULL));
+		}
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_ARGUMENT,
+			    /* TRANSLATORS: %1 is a filename, %2 is a internet address and %3 is
+			       the untranslated error phrase */
+			    _("Failed to download %s from %s: %s"),
+			    values[0],
+			    remote_addr,
+			    soup_status_get_phrase(status));
+		return FALSE;
+	}
+
+	/* we HAVE to verify the checksum */
+	checksum = g_compute_checksum_for_bytes(G_CHECKSUM_SHA256, bytes);
+	if (g_strcmp0(checksum, values[1]) != 0) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_ARGUMENT,
+			    /* TRANSLATORS: %1 is a filename, %2 is a internet address */
+			    _("Failed to download %s from %s as file checksum does not match"),
+			    values[0],
+			    remote_addr);
+		return FALSE;
+	}
+
+	/* save file */
+	if (!g_file_set_contents(values[0],
+				 (const gchar *)g_bytes_get_data(bytes, NULL),
+				 g_bytes_get_size(bytes),
+				 error))
+		return FALSE;
+
+	/* success */
+	response_headers = soup_message_get_response_headers(msg);
+	content_type = soup_message_headers_get_content_type(response_headers, NULL);
+	size = g_format_size(g_bytes_get_size(bytes));
+	/* TRANSLATORS: %1 is a filename, %2 is size (e.g. '1.3 MB') and %3 is a type, (e.g.
+	 * 'application/zstd') */
+	g_print(_("Saved %s (%s of %s)"), values[0], size, content_type);
+	g_print("\n");
+	return TRUE;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -428,6 +544,13 @@ main(int argc, char *argv[])
 				 /* TRANSLATORS: CLI action description */
 				 _("Unpublish an existing file"),
 				 passim_cli_unpublish);
+	passim_cli_cmd_array_add(cmd_array,
+				 "download",
+				 /* TRANSLATORS: CLI option example */
+				 _("BASENAME HASH"),
+				 /* TRANSLATORS: CLI action description */
+				 _("Download a file from a remote machine"),
+				 passim_cli_download);
 	passim_cli_cmd_array_sort(cmd_array);
 
 	cmd_descriptions = passim_cli_cmd_array_to_string(cmd_array);
