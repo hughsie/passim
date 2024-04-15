@@ -101,6 +101,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 	if (g_strcmp0(signal_name, "Found") == 0) {
 		const gchar *host = NULL;
 		guint16 port = 0;
+		g_autoptr(GSocketAddress) socket_addr = NULL;
 		g_variant_get(parameters,
 			      "(iissssisqaayu)",
 			      NULL,
@@ -114,7 +115,12 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 			      &port,
 			      NULL,
 			      NULL);
-		helper->address = g_strdup_printf("%s:%i", host, port);
+		socket_addr = g_inet_socket_address_new_from_string(host, port);
+		if (g_socket_address_get_family(socket_addr) == G_SOCKET_FAMILY_IPV6) {
+			helper->address = g_strdup_printf("[%s]:%i", host, port);
+		} else {
+			helper->address = g_strdup_printf("%s:%i", host, port);
+		}
 		passim_avahi_service_resolver_free(task);
 		return;
 	}
