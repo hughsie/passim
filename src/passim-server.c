@@ -1404,6 +1404,8 @@ passim_server_get_property(GDBusConnection *connection_,
 
 	if (g_strcmp0(property_name, "DaemonVersion") == 0)
 		return g_variant_new_string(SOURCE_VERSION);
+	if (g_strcmp0(property_name, "Name") == 0)
+		return g_variant_new_string(passim_avahi_get_name(self->avahi));
 	if (g_strcmp0(property_name, "Status") == 0)
 		return g_variant_new_uint32(self->status);
 	if (g_strcmp0(property_name, "DownloadSaving") == 0)

@@ -28,6 +28,15 @@
         </doc:description>
       </doc:doc>
     </property>
+    <property name='Name' type='s' access='read'>
+      <doc:doc>
+        <doc:description>
+          <doc:para>
+            The daemon auto-generated name, e.g. "Passim-0801".
+          </doc:para>
+        </doc:description>
+      </doc:doc>
+    </property>
     <property name='Status' type='u' access='read'>
       <doc:doc>
         <doc:description>
