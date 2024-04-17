@@ -20,6 +20,16 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.7" date="2024-04-17">
+      <description>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Fix a crash when deleting items</li>
+          <li>Fix a small memory leak when parsing a request with duplicate arguments</li>
+          <li>Lock the systemd service down some more</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.6" date="2024-04-15">
       <description>
         <p>
