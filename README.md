@@ -2,6 +2,7 @@
 
 [![Translation status](https://hosted.weblate.org/widget/passim/svg-badge.svg)](https://hosted.weblate.org/engage/passim/)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/hughsie/passim/badge)](https://securityscorecards.dev/viewer/?uri=github.com/hughsie/passim)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8814/badge)](https://www.bestpractices.dev/projects/8814)
 
 A local caching server. Named after the Latin word for “here, there and everywhere”.
 
