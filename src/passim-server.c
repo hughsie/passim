@@ -960,6 +960,13 @@ passim_server_handler_cb(SoupServer *server,
 		if (g_strv_length(kv) != 2)
 			continue;
 		if (g_strcmp0(kv[0], "sha256") == 0) {
+			if (hash != NULL) {
+				passim_server_msg_send_error(self,
+							     msg,
+							     SOUP_STATUS_BAD_REQUEST,
+							     "duplicate sha256= argument");
+				return;
+			}
 			hash = g_strdup(kv[1]);
 			continue;
 		}
