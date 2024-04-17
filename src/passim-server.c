@@ -806,6 +806,15 @@ passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 		g_prefix_error(error, "failed to delete %s: ", passim_item_get_hash(item));
 		return FALSE;
 	}
+
+	/* log */
+	passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
+	passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
+	if (!passim_server_eventlog(self, "DELTE", event_msg->str, error)) {
+		g_prefix_error(error, "failed to log: ");
+		return FALSE;
+	}
+
 	g_hash_table_remove(self->items, passim_item_get_hash(item));
 	if (!passim_server_avahi_register(self, error)) {
 		g_prefix_error(error, "failed to register: ");
@@ -813,9 +822,7 @@ passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 	}
 
 	/* success */
-	passim_server_append_str(event_msg, "hash", passim_item_get_hash(item));
-	passim_server_append_str(event_msg, "basename", passim_item_get_basename(item));
-	return passim_server_eventlog(self, "DELTE", event_msg->str, error);
+	return TRUE;
 }
 
 static void
