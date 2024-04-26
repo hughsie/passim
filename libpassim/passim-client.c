@@ -367,6 +367,7 @@ passim_client_input_stream_from_bytes(GBytes *bytes, GError **error)
 	}
 	rc = write(fd, g_bytes_get_data(bytes, NULL), g_bytes_get_size(bytes));
 	if (rc < 0) {
+		g_close(fd, NULL);
 		g_set_error(error,
 			    G_IO_ERROR,
 			    G_IO_ERROR_INVALID_DATA,
@@ -375,6 +376,7 @@ passim_client_input_stream_from_bytes(GBytes *bytes, GError **error)
 		return NULL;
 	}
 	if (lseek(fd, 0, SEEK_SET) < 0) {
+		g_close(fd, NULL);
 		g_set_error(error,
 			    G_IO_ERROR,
 			    G_IO_ERROR_INVALID_DATA,
