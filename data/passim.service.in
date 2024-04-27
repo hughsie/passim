@@ -30,9 +30,9 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
-SystemCallFilter=@system-service
-SystemCallFilter=~@resources
-SystemCallErrorNumber=EPERM
+# allow-list, see `systemd-analyze syscall-filter` for what each group adds
+SystemCallFilter=@basic-io @file-system @io-event @ipc @network-io @process @signal madvise
+SystemCallErrorNumber=SIGSYS
 SystemCallArchitectures=native
 StateDirectory=passim passim/data
 LogsDirectory=passim
