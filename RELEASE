@@ -16,9 +16,9 @@ export release_ver="0.1.8"
 
 git commit -a -m "Release ${release_ver}" --no-verify
 git tag -s -f -m "Release ${release_ver}" "${release_ver}"
+ninja dist
 git push --tags
 git push
-ninja dist
 gpg -b -a meson-dist/passim-${release_ver}.tar.xz
 
 Create release and upload tarball to https://github.com/hughsie/passim/tags
