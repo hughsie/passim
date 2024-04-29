@@ -1,5 +1,5 @@
 project('passim', 'c',
-  version: '0.1.8',
+  version: '0.1.9',
   license: 'LGPL-2.1-or-later',
   meson_version: '>=0.61.0',
   default_options: ['warning_level=2', 'c_std=c11'],
