@@ -12,6 +12,7 @@ RUN apt-get install -yq --no-install-recommends \
 	meson \
 	ninja-build \
 	pkg-config \
+	systemd-dev \
 	shared-mime-info
 
 # Meson is too old in unstable, and that won't change until Buster is released
