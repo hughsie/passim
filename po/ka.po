@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: passim\n"
 "Report-Msgid-Bugs-To: richard@hughsie.com\n"
 "POT-Creation-Date: 2024-04-15 14:10+0100\n"
-"PO-Revision-Date: 2024-06-17 06:09+0000\n"
+"PO-Revision-Date: 2024-08-10 04:09+0000\n"
 "Last-Translator: Temuri Doghonadze <temuri.doghonadze@gmail.com>\n"
 "Language-Team: Georgian <https://hosted.weblate.org/projects/passim/passim/"
 "ka/>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.6-dev\n"
+"X-Generator: Weblate 5.7-dev\n"
 
 #. TRANSLATORS: the item is not enabled
 #: src/passim-cli.c:180
@@ -27,7 +27,7 @@ msgstr "გამორთულია"
 #. TRANSLATORS: only begin sharing the item after the next restart
 #: src/passim-cli.c:184
 msgid "Next Reboot"
-msgstr "შემდეგი გადატვირთვის შემდეგ"
+msgstr "შემდეგი გადატვირთვა"
 
 #. TRANSLATORS: item file basename
 #: src/passim-cli.c:197
