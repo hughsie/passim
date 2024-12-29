@@ -36,3 +36,6 @@ SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
 StateDirectory=passim passim/data
 LogsDirectory=passim
+
+[Install]
+WantedBy=multi-user.target
