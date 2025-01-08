@@ -200,7 +200,7 @@ passim_client_proxy_signal_cb(GDBusProxy *proxy,
  * @self: a #PassimClient
  * @error: (nullable): optional return location for an error
  *
- * Loads the client from a file on disk.
+ * Loads properties from the passim daemon.
  *
  * Returns: %TRUE for success
  *
@@ -214,6 +214,8 @@ passim_client_load(PassimClient *self, GError **error)
 	g_return_val_if_fail(PASSIM_IS_CLIENT(self), FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
+	if (priv->proxy != NULL)
+		return TRUE;
 	priv->proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
 						    G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS,
 						    NULL,
