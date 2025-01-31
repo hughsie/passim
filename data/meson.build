@@ -13,8 +13,12 @@ install_data(
   install_dir: datadir / meson.project_name(),
 )
 install_data(
+  'org.freedesktop.Passim.svg',
+  install_dir: datadir / 'icons/hicolor/scalable/apps',
+)
+install_data(
   'org.freedesktop.Passim.png',
-  install_dir: datadir / 'icons/hicolor/scalable/apps/org.freedesktop.Passim.png',
+  install_dir: datadir / 'icons/hicolor/128x128/apps',
 )
 
 con2 = configuration_data()
