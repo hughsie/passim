@@ -20,6 +20,14 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.9" date="2025-02-03">
+      <description>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Install the icons to the correct location</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.8" date="2024-04-29">
       <description>
         <p>This release fixes the following bugs:</p>
