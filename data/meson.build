@@ -18,7 +18,7 @@ install_data(
 )
 install_data(
   'org.freedesktop.Passim.png',
-  install_dir: datadir / 'icons/hicolor/128x128/apps',
+  install_dir: datadir / 'icons/hicolor/256x256/apps',
 )
 
 con2 = configuration_data()
