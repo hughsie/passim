@@ -839,7 +839,11 @@ passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimIt
 
 	passim_server_msg_send_file(self, msg, path);
 	passim_item_set_share_count(item, passim_item_get_share_count(item) + 1);
+}
 
+static void
+passim_server_check_share_limit(PassimServer *self, PassimItem *item)
+{
 	/* we've shared this enough now */
 	if (passim_item_get_share_limit(item) > 0 &&
 	    passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
@@ -1023,6 +1027,8 @@ passim_server_handler_cb(SoupServer *server,
 		passim_server_append_str(event_msg, "ipaddr", inet_addrstr);
 		if (!passim_server_eventlog(self, "SHARE", event_msg->str, &error))
 			g_warning("failed to log: %s", error->message);
+
+		passim_server_check_share_limit(self, item);
 		return;
 	}
 
