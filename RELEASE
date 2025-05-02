@@ -2,7 +2,7 @@ Passim Release Notes
 
 Write release entries:
 
-git log --format="%s" --cherry-pick --right-only 0.1.8... | grep -i -v trivial | grep -v Merge | sort | uniq
+git log --format="%s" --cherry-pick --right-only 0.1.9... | grep -i -v trivial | grep -v Merge | sort | uniq
 Add any user visible changes into ../data/org.freedesktop.Passim.metainfo.xml
 appstream-util appdata-to-news ../data/org.freedesktop.Passim.metainfo.xml > NEWS
 
@@ -12,7 +12,7 @@ ninja-build passim-pot
 git commit -a -m "trivial: Update translations for Weblate"
 
 # MAKE SURE THIS IS CORRECT
-export release_ver="0.1.9"
+export release_ver="0.1.10"
 
 git commit -a -m "Release ${release_ver}" --no-verify
 git tag -s -f -m "Release ${release_ver}" "${release_ver}"
