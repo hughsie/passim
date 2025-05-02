@@ -20,6 +20,17 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.10" date="2025-05-02">
+      <description>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Adjust man page to parse properly in tools like lexgrog</li>
+          <li>Fix a crash when reaching the share limit</li>
+          <li>Fix the location the icon is installed to match the correct size</li>
+          <li>Restart service after failure</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.9" date="2025-02-03">
       <description>
         <p>This release fixes the following bugs:</p>
