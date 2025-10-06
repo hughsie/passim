@@ -470,8 +470,11 @@ passim_client_publish(PassimClient *self, PassimItem *item, GError **error)
 			g_dbus_error_strip_remote_error(*error);
 		return FALSE;
 	}
-	if (g_dbus_message_to_gerror(reply, error))
+	if (g_dbus_message_to_gerror(reply, error)) {
+		if (error != NULL)
+			g_dbus_error_strip_remote_error(*error);
 		return FALSE;
+	}
 
 	/* success */
 	return TRUE;
