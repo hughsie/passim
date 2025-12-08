@@ -19,6 +19,6 @@ jobs:
           - debian
       fail-fast: false
     steps:
-      - uses: actions/checkout@v6.0.0
+      - uses: actions/checkout@v6.0.1
       - run: docker build -t passim-${{ matrix.distro }} -f contrib/ci/Dockerfile-${{ matrix.distro }} .
       - run: docker run -t -v `pwd`:/build passim-${{ matrix.distro }} ./contrib/ci/build-${{ matrix.distro }}.sh
