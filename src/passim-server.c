@@ -1308,6 +1308,17 @@ passim_server_method_call(GDBusConnection *connection,
 			return;
 		}
 
+		/* sanity check basename does not contain control characters */
+		for (const gchar *p = passim_item_get_basename(item); *p != '\0'; p++) {
+			if (g_ascii_iscntrl(*p)) {
+				g_dbus_method_invocation_return_error_literal(invocation,
+									      G_DBUS_ERROR,
+									      G_DBUS_ERROR_INVALID_ARGS,
+									      "basename contains control characters");
+				return;
+			}
+		}
+
 		/* sanity check share values */
 		if (passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
 			g_dbus_method_invocation_return_error(invocation,
