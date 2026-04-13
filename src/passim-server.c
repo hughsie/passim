@@ -643,9 +643,10 @@ passim_server_context_send_redirect(PassimServerContext *ctx, const gchar *locat
 	g_autoptr(GString) html = g_string_new(NULL);
 	g_autofree gchar *uri =
 	    g_strdup_printf("https://%s/%s?sha256=%s", location, ctx->basename, ctx->hash);
+	g_autofree gchar *uri_escaped = g_markup_escape_text(uri, -1);
 	g_string_append_printf(html,
 			       "<html><body><a href=\"%s\">Redirecting</a>...</body></html>",
-			       uri);
+			       uri_escaped);
 	soup_message_headers_append(hdrs, "Location", uri);
 	soup_server_message_set_status(ctx->msg, SOUP_STATUS_MOVED_TEMPORARILY, NULL);
 	soup_server_message_set_response(ctx->msg,
@@ -698,24 +699,27 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
 			g_autofree gchar *flags = passim_item_get_flags_as_string(item);
+			g_autofree gchar *basename_escaped = g_markup_escape_text(passim_item_get_basename(item), -1);
 			g_autofree gchar *url = g_strdup_printf("https://localhost:%u/%s?sha256=%s",
 								self->port,
 								passim_item_get_basename(item),
 								hash);
+			g_autofree gchar *url_escaped = g_markup_escape_text(url, -1);
 			g_string_append(html, "<tr>\n");
 			g_string_append_printf(html,
 					       "<td><a href=\"%s\">%s</a></td>\n",
-					       url,
-					       passim_item_get_basename(item));
+					       url_escaped,
+					       basename_escaped);
 			g_string_append_printf(html,
 					       "<td><code>%s</code></td>\n",
 					       passim_item_get_hash(item));
 			if (passim_item_get_cmdline(item) == NULL) {
 				g_string_append_printf(html, "<td><code>n/a</code></td>\n");
 			} else {
+				g_autofree gchar *cmdline_escaped = g_markup_escape_text(passim_item_get_cmdline(item), -1);
 				g_string_append_printf(html,
 						       "<td><code>%s</code></td>\n",
-						       passim_item_get_cmdline(item));
+						       cmdline_escaped);
 			}
 			if (passim_item_get_max_age(item) == G_MAXUINT32) {
 				g_string_append_printf(html,
