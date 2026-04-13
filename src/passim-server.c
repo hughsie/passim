@@ -295,7 +295,7 @@ passim_server_append_u64(GString *str, const gchar *key, guint64 value)
 {
 	if (str->len > 0)
 		g_string_append_c(str, ',');
-	g_string_append_printf(str, "%s=%u", key, (guint)value);
+	g_string_append_printf(str, "%s=%" G_GUINT64_FORMAT, key, value);
 }
 
 static gboolean
