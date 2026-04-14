@@ -699,7 +699,8 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
 			g_autofree gchar *flags = passim_item_get_flags_as_string(item);
-			g_autofree gchar *basename_escaped = g_markup_escape_text(passim_item_get_basename(item), -1);
+			g_autofree gchar *basename_escaped =
+			    g_markup_escape_text(passim_item_get_basename(item), -1);
 			g_autofree gchar *url = g_strdup_printf("https://localhost:%u/%s?sha256=%s",
 								self->port,
 								passim_item_get_basename(item),
@@ -716,7 +717,8 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 			if (passim_item_get_cmdline(item) == NULL) {
 				g_string_append_printf(html, "<td><code>n/a</code></td>\n");
 			} else {
-				g_autofree gchar *cmdline_escaped = g_markup_escape_text(passim_item_get_cmdline(item), -1);
+				g_autofree gchar *cmdline_escaped =
+				    g_markup_escape_text(passim_item_get_cmdline(item), -1);
 				g_string_append_printf(html,
 						       "<td><code>%s</code></td>\n",
 						       cmdline_escaped);
@@ -1315,10 +1317,11 @@ passim_server_method_call(GDBusConnection *connection,
 		/* sanity check basename does not contain control characters */
 		for (const gchar *p = passim_item_get_basename(item); *p != '\0'; p++) {
 			if (g_ascii_iscntrl(*p)) {
-				g_dbus_method_invocation_return_error_literal(invocation,
-									      G_DBUS_ERROR,
-									      G_DBUS_ERROR_INVALID_ARGS,
-									      "basename contains control characters");
+				g_dbus_method_invocation_return_error_literal(
+				    invocation,
+				    G_DBUS_ERROR,
+				    G_DBUS_ERROR_INVALID_ARGS,
+				    "basename contains control characters");
 				return;
 			}
 		}

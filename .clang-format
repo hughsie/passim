@@ -33,15 +33,11 @@ TabWidth: '8'
 UseTab: 'Always'
 PenaltyBreakAssignment: '3'
 PenaltyBreakBeforeFirstCallParameter: '15'
----
-Language: 'Proto'
----
-Language: 'Cpp'
 IncludeCategories:
   - Regex:           '^"config.h"$'
-    Priority:        '0'
+    Priority:        0
   - Regex:           '^<'
-    Priority:        '2'
+    Priority:        2
   - Regex:           '.*'
-    Priority:        '4'
+    Priority:        4
 ...
