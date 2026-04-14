@@ -20,6 +20,16 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.11" date="2026-04-14">
+      <description>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Correct integer truncation in 64-bit value logging</li>
+          <li>Escape the published basename in the web interface</li>
+          <li>Prevent log corruption via control characters in basename</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.10" date="2025-05-02">
       <description>
         <p>This release fixes the following bugs:</p>
