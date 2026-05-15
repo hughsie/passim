@@ -148,7 +148,7 @@ passim_xattr_get_string(const gchar *filename, const gchar *name, GError **error
 
 	/* copy out with appended NUL */
 	buf = g_new0(gchar, rc + 1);
-	rc = getxattr(filename, name, buf, rc + 1);
+	rc = getxattr(filename, name, buf, rc);
 	if (rc < 0) {
 		g_set_error(error,
 			    G_IO_ERROR,
