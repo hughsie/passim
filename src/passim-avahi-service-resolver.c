@@ -257,6 +257,7 @@ passim_avahi_service_resolver_async(GDBusProxy *proxy,
 	    g_new0(PassimAvahiServiceResolverHelper, 1);
 
 	task = g_task_new(proxy, cancellable, callback, callback_data);
+	g_task_set_source_tag(task, passim_avahi_service_resolver_async);
 
 	/* work around a bug in Avahi, see https://github.com/lathiat/avahi/issues/446 */
 	helper->signals = g_ptr_array_new_with_free_func((GDestroyNotify)passim_avahi_signal_free);

@@ -354,6 +354,7 @@ passim_avahi_find_async(PassimAvahi *self,
 	helper->addresses = g_ptr_array_new_with_free_func(g_free);
 
 	task = g_task_new(self, cancellable, callback, callback_data);
+	g_task_set_source_tag(task, passim_avahi_find_async);
 	g_task_set_task_data(task,
 			     g_steal_pointer(&helper),
 			     (GDestroyNotify)passim_avahi_find_helper_free);
