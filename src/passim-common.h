@@ -37,6 +37,8 @@ passim_xattr_set_string(const gchar *filename,
 gchar *
 passim_xattr_get_string(const gchar *filename, const gchar *name, GError **error);
 gboolean
+passim_is_valid_sha256(const gchar *hash);
+gboolean
 passim_mkdir(const gchar *dirname, GError **error);
 gboolean
 passim_mkdir_parent(const gchar *filename, GError **error);
