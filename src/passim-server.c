@@ -634,7 +634,6 @@ passim_server_msg_send_error(PassimServer *self,
 			       reason_escaped);
 	soup_server_message_set_status(msg, status_code, NULL);
 	soup_server_message_set_response(msg, "text/html", SOUP_MEMORY_COPY, html->str, html->len);
-	soup_server_message_unpause(msg);
 }
 
 static void
@@ -878,6 +877,7 @@ passim_server_avahi_find_cb(GObject *source_object, GAsyncResult *res, gpointer 
 	addresses = passim_avahi_find_finish(PASSIM_AVAHI(source_object), res, &error);
 	if (addresses == NULL) {
 		passim_server_msg_send_error(ctx->self, ctx->msg, 404, error->message);
+		soup_server_message_unpause(ctx->msg);
 		return;
 	}
 
