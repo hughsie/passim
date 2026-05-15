@@ -193,9 +193,27 @@ passim_server_update_download_saving_arg(PassimServer *self, const gchar *arg, G
 static gboolean
 passim_server_update_download_saving_args(PassimServer *self, const gchar *args, GError **error)
 {
-	g_auto(GStrv) sections = g_strsplit(args, ",", -1);
-	for (guint i = 0; sections[i] != NULL; i++) {
-		if (!passim_server_update_download_saving_arg(self, sections[i], error))
+	g_autoptr(GPtrArray) sections = g_ptr_array_new_with_free_func(g_free);
+	GString *current = g_string_new(NULL);
+
+	for (const gchar *p = args; *p != '\0'; p++) {
+		if (*p == '\\' && *(p + 1) != '\0') {
+			g_string_append_c(current, *(++p));
+			continue;
+		}
+		if (*p == ',') {
+			g_ptr_array_add(sections, g_string_free(current, FALSE));
+			current = g_string_new(NULL);
+			continue;
+		}
+		g_string_append_c(current, *p);
+	}
+	g_ptr_array_add(sections, g_string_free(current, FALSE));
+
+	for (guint i = 0; i < sections->len; i++) {
+		if (!passim_server_update_download_saving_arg(self,
+							      g_ptr_array_index(sections, i),
+							      error))
 			return FALSE;
 	}
 	return TRUE;
@@ -287,7 +305,12 @@ passim_server_append_str(GString *str, const gchar *key, const gchar *value)
 {
 	if (str->len > 0)
 		g_string_append_c(str, ',');
-	g_string_append_printf(str, "%s=%s", key, value);
+	g_string_append_printf(str, "%s=", key);
+	for (const gchar *p = value; *p != '\0'; p++) {
+		if (*p == ',' || *p == '=' || *p == '\\')
+			g_string_append_c(str, '\\');
+		g_string_append_c(str, *p);
+	}
 }
 
 static void
