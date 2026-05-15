@@ -182,7 +182,7 @@ static gboolean
 passim_server_update_download_saving_arg(PassimServer *self, const gchar *arg, GError **error)
 {
 	g_auto(GStrv) kvs = g_strsplit(arg, "=", -1);
-	if (g_strcmp0(kvs[0], "size") == 0) {
+	if (g_strv_length(kvs) == 2 && g_strcmp0(kvs[0], "size") == 0) {
 		guint64 value = g_ascii_strtoull(kvs[1], NULL, 10);
 		if (value != G_MAXUINT64 && value != 0)
 			self->download_saving += value;
