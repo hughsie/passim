@@ -792,9 +792,8 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 
 	mapping = g_mapped_file_new(path, FALSE, &error);
 	if (mapping == NULL) {
-		soup_server_message_set_status(msg,
-					       SOUP_STATUS_INTERNAL_SERVER_ERROR,
-					       error->message);
+		g_debug("failed to map file: %s", error->message);
+		soup_server_message_set_status(msg, SOUP_STATUS_INTERNAL_SERVER_ERROR, NULL);
 		return;
 	}
 	bytes = g_bytes_new_with_free_func(g_mapped_file_get_contents(mapping),
@@ -811,9 +810,8 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 				 NULL,
 				 &error);
 	if (info == NULL) {
-		soup_server_message_set_status(msg,
-					       SOUP_STATUS_INTERNAL_SERVER_ERROR,
-					       error->message);
+		g_debug("failed to query file info: %s", error->message);
+		soup_server_message_set_status(msg, SOUP_STATUS_INTERNAL_SERVER_ERROR, NULL);
 		return;
 	}
 	if (g_file_info_get_content_type(info) != NULL) {
