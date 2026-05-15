@@ -52,6 +52,7 @@ static void
 passim_common_func(void)
 {
 	gboolean ret;
+	guint16 port;
 	guint32 value_u32;
 	g_autofree gchar *boot_time = NULL;
 	g_autofree gchar *value_str1 = NULL;
@@ -59,6 +60,26 @@ passim_common_func(void)
 	g_autofree gchar *xargs_fn = NULL;
 	g_autofree gchar *xargs_path = NULL;
 	g_autoptr(GError) error = NULL;
+	g_autoptr(GKeyFile) kf = g_key_file_new();
+
+	/* port validation */
+	g_key_file_set_integer(kf, "daemon", "Port", 27500);
+	port = passim_config_get_port(kf);
+	g_assert_cmpint(port, ==, 27500);
+
+	/* out-of-range port should fall back to default */
+	g_key_file_set_integer(kf, "daemon", "Port", 70000);
+	g_test_expect_message(NULL, G_LOG_LEVEL_WARNING, "invalid port*");
+	port = passim_config_get_port(kf);
+	g_test_assert_expected_messages();
+	g_assert_cmpint(port, ==, 27500);
+
+	/* negative port should fall back to default */
+	g_key_file_set_integer(kf, "daemon", "Port", -1);
+	g_test_expect_message(NULL, G_LOG_LEVEL_WARNING, "invalid port*");
+	port = passim_config_get_port(kf);
+	g_test_assert_expected_messages();
+	g_assert_cmpint(port, ==, 27500);
 
 	/* valid sha256 hash */
 	g_assert_true(passim_is_valid_sha256(
