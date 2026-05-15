@@ -201,6 +201,16 @@ passim_xattr_get_uint32(const gchar *filename,
 			    strerror(errno));
 		return G_MAXUINT32;
 	}
+	if ((gsize)rc != sizeof(value)) {
+		g_set_error(error,
+			    G_IO_ERROR,
+			    G_IO_ERROR_INVALID_DATA,
+			    "wrong size for %s: expected %" G_GSIZE_FORMAT ", got %zd",
+			    name,
+			    sizeof(value),
+			    rc);
+		return G_MAXUINT32;
+	}
 	if (value == G_MAXUINT32) {
 		g_set_error(error,
 			    G_IO_ERROR,
