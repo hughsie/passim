@@ -625,12 +625,13 @@ passim_server_msg_send_error(PassimServer *self,
 {
 	g_autoptr(GString) html = g_string_new(NULL);
 	const gchar *reason_fallback = reason ? reason : soup_status_get_phrase(status_code);
+	g_autofree gchar *reason_escaped = g_markup_escape_text(reason_fallback, -1);
 	g_string_append_printf(html,
 			       "<html><head><title>%u %s</title></head>"
 			       "<body>%s</body></html>",
 			       status_code,
 			       soup_status_get_phrase(status_code),
-			       reason_fallback);
+			       reason_escaped);
 	soup_server_message_set_status(msg, status_code, NULL);
 	soup_server_message_set_response(msg, "text/html", SOUP_MEMORY_COPY, html->str, html->len);
 	soup_server_message_unpause(msg);
