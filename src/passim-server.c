@@ -891,6 +891,8 @@ static gboolean
 passim_server_is_loopback(const gchar *inet_addr)
 {
 	g_autoptr(GInetAddress) address = g_inet_address_new_from_string(inet_addr);
+	if (address == NULL)
+		return FALSE;
 	return g_inet_address_get_is_loopback(address);
 }
 
