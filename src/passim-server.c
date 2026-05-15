@@ -1006,7 +1006,7 @@ passim_server_handler_cb(SoupServer *server,
 					     "sha256= argument required");
 		return;
 	}
-	if (!g_str_is_ascii(hash) || strlen(hash) != 64) {
+	if (!passim_is_valid_sha256(hash)) {
 		passim_server_msg_send_error(self,
 					     msg,
 					     SOUP_STATUS_NOT_ACCEPTABLE,

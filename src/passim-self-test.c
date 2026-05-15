@@ -60,6 +60,20 @@ passim_common_func(void)
 	g_autofree gchar *xargs_path = NULL;
 	g_autoptr(GError) error = NULL;
 
+	/* valid sha256 hash */
+	g_assert_true(passim_is_valid_sha256(
+	    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+
+	/* wrong length */
+	g_assert_false(passim_is_valid_sha256("e3b0c44298fc1c14"));
+
+	/* non-hex character in hash */
+	g_assert_false(passim_is_valid_sha256(
+	    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
+
+	/* NULL hash */
+	g_assert_false(passim_is_valid_sha256(NULL));
+
 	/* ensure we got *something* */
 	boot_time = passim_get_boot_time();
 	g_assert_cmpstr(boot_time, !=, NULL);

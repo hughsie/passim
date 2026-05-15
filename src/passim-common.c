@@ -213,6 +213,22 @@ passim_xattr_get_uint32(const gchar *filename,
 }
 
 gboolean
+passim_is_valid_sha256(const gchar *hash)
+{
+	const gchar *p;
+
+	if (hash == NULL)
+		return FALSE;
+	if (strlen(hash) != 64)
+		return FALSE;
+	for (p = hash; *p != '\0'; p++) {
+		if (!g_ascii_isxdigit(*p))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+gboolean
 passim_mkdir(const gchar *dirname, GError **error)
 {
 	g_return_val_if_fail(dirname != NULL, FALSE);
