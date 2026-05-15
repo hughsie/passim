@@ -22,7 +22,7 @@ static void
 passim_avahi_service_browser_helper_free(PassimAvahiServiceBrowserHelper *helper)
 {
 	if (helper->signal_id > 0)
-		g_signal_handler_disconnect(helper->proxy, helper->signal_id);
+		g_clear_signal_handler(&helper->signal_id, helper->proxy);
 	if (helper->proxy != NULL)
 		g_object_unref(helper->proxy);
 	g_ptr_array_unref(helper->items);
@@ -66,10 +66,7 @@ passim_avahi_service_browser_free(GTask *task)
 	PassimAvahiServiceBrowserHelper *helper = g_task_get_task_data(task);
 
 	/* needed? */
-	if (helper->signal_id > 0) {
-		g_signal_handler_disconnect(helper->proxy, helper->signal_id);
-		helper->signal_id = 0;
-	}
+	g_clear_signal_handler(&helper->signal_id, helper->proxy);
 	g_dbus_proxy_call(helper->proxy,
 			  "Free",
 			  NULL,

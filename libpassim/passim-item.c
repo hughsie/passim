@@ -398,10 +398,7 @@ passim_item_set_bytes(PassimItem *self, GBytes *bytes)
 	/* unchanged */
 	if (bytes == priv->bytes)
 		return;
-	if (priv->bytes != NULL) {
-		g_bytes_unref(priv->bytes);
-		priv->bytes = NULL;
-	}
+	g_clear_pointer (&priv->bytes, g_bytes_unref);
 	if (bytes != NULL) {
 		priv->bytes = g_bytes_ref(bytes);
 		priv->size = g_bytes_get_size(bytes);
