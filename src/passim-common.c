@@ -64,7 +64,12 @@ passim_config_load(GError **error)
 guint16
 passim_config_get_port(GKeyFile *kf)
 {
-	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL);
+	gint value = g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PORT, NULL);
+	if (value <= 0 || value > G_MAXUINT16) {
+		g_warning("invalid port %i, using default", value);
+		return 27500;
+	}
+	return (guint16)value;
 }
 
 gboolean
