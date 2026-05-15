@@ -642,8 +642,10 @@ passim_server_context_send_redirect(PassimServerContext *ctx, const gchar *locat
 {
 	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(ctx->msg);
 	g_autoptr(GString) html = g_string_new(NULL);
+	g_autofree gchar *basename_encoded =
+	    g_uri_escape_string(ctx->basename, NULL, FALSE);
 	g_autofree gchar *uri =
-	    g_strdup_printf("https://%s/%s?sha256=%s", location, ctx->basename, ctx->hash);
+	    g_strdup_printf("https://%s/%s?sha256=%s", location, basename_encoded, ctx->hash);
 	g_autofree gchar *uri_escaped = g_markup_escape_text(uri, -1);
 	g_string_append_printf(html,
 			       "<html><body><a href=\"%s\">Redirecting</a>...</body></html>",
