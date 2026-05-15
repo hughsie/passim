@@ -337,11 +337,10 @@ passim_item_load_bytes_nofollow(PassimItem *item, const gchar *filename, GError 
 {
 	gint fd;
 	g_autoptr(GBytes) bytes = NULL;
-	g_autoptr(GInputStream) istream = NULL;
 	g_autoptr(GMappedFile) mapped_file = NULL;
 
 	/* load bytes from the fd to avoid TOCTOU */
-	fd = g_open(filename, O_NOFOLLOW, S_IRUSR);
+	fd = g_open(filename, O_NOFOLLOW | O_RDONLY, S_IRUSR);
 	if (fd < 0) {
 		g_set_error(error,
 			    G_IO_ERROR,
@@ -350,16 +349,8 @@ passim_item_load_bytes_nofollow(PassimItem *item, const gchar *filename, GError 
 			    filename);
 		return FALSE;
 	}
-	istream = g_unix_input_stream_new(fd, TRUE);
-	if (istream == NULL) {
-		g_set_error(error,
-			    G_IO_ERROR,
-			    G_IO_ERROR_FAILED,
-			    "no stream to read from %s",
-			    filename);
-		return FALSE;
-	}
 	mapped_file = g_mapped_file_new_from_fd(fd, FALSE, error);
+	close(fd);
 	if (mapped_file == NULL)
 		return FALSE;
 	bytes = g_mapped_file_get_bytes(mapped_file);
