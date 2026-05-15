@@ -642,8 +642,7 @@ passim_server_context_send_redirect(PassimServerContext *ctx, const gchar *locat
 {
 	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(ctx->msg);
 	g_autoptr(GString) html = g_string_new(NULL);
-	g_autofree gchar *basename_encoded =
-	    g_uri_escape_string(ctx->basename, NULL, FALSE);
+	g_autofree gchar *basename_encoded = g_uri_escape_string(ctx->basename, NULL, FALSE);
 	g_autofree gchar *uri =
 	    g_strdup_printf("https://%s/%s?sha256=%s", location, basename_encoded, ctx->hash);
 	g_autofree gchar *uri_escaped = g_markup_escape_text(uri, -1);
@@ -665,6 +664,8 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 {
 	g_autoptr(GString) html = g_string_new(NULL);
 	g_autoptr(GList) keys = g_hash_table_get_keys(self->items);
+	g_autofree gchar *name_escaped =
+	    g_markup_escape_text(passim_avahi_get_name(self->avahi), -1);
 
 	g_string_append(html, "<html>\n");
 	g_string_append(html, "<head>\n");
@@ -672,11 +673,11 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 	g_string_append(
 	    html,
 	    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n");
-	g_string_append_printf(html, "<title>%s</title>\n", passim_avahi_get_name(self->avahi));
+	g_string_append_printf(html, "<title>%s</title>\n", name_escaped);
 	g_string_append(html, "<link href=\"style.css\" rel=\"stylesheet\" />\n");
 	g_string_append(html, "</head>");
 	g_string_append(html, "<body>");
-	g_string_append_printf(html, "<h1>%s</h1>\n", passim_avahi_get_name(self->avahi));
+	g_string_append_printf(html, "<h1>%s</h1>\n", name_escaped);
 	g_string_append_printf(
 	    html,
 	    "<p>A <a href=\"https://github.com/hughsie/%s\">local caching server</a>, "
@@ -702,11 +703,16 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 			const gchar *hash = l->data;
 			PassimItem *item = g_hash_table_lookup(self->items, hash);
 			g_autofree gchar *flags = passim_item_get_flags_as_string(item);
+			g_autofree gchar *flags_escaped = g_markup_escape_text(flags, -1);
+			g_autofree gchar *hash_escaped =
+			    g_markup_escape_text(passim_item_get_hash(item), -1);
 			g_autofree gchar *basename_escaped =
 			    g_markup_escape_text(passim_item_get_basename(item), -1);
+			g_autofree gchar *basename_uri =
+			    g_uri_escape_string(passim_item_get_basename(item), NULL, TRUE);
 			g_autofree gchar *url = g_strdup_printf("https://localhost:%u/%s?sha256=%s",
 								self->port,
-								passim_item_get_basename(item),
+								basename_uri,
 								hash);
 			g_autofree gchar *url_escaped = g_markup_escape_text(url, -1);
 			g_string_append(html, "<tr>\n");
@@ -714,9 +720,7 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 					       "<td><a href=\"%s\">%s</a></td>\n",
 					       url_escaped,
 					       basename_escaped);
-			g_string_append_printf(html,
-					       "<td><code>%s</code></td>\n",
-					       passim_item_get_hash(item));
+			g_string_append_printf(html, "<td><code>%s</code></td>\n", hash_escaped);
 			if (passim_item_get_cmdline(item) == NULL) {
 				g_string_append_printf(html, "<td><code>n/a</code></td>\n");
 			} else {
@@ -752,7 +756,7 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 				g_autofree gchar *size = g_format_size(passim_item_get_size(item));
 				g_string_append_printf(html, "<td>%s</td>\n", size);
 			}
-			g_string_append_printf(html, "<td><code>%s</code></td>\n", flags);
+			g_string_append_printf(html, "<td><code>%s</code></td>\n", flags_escaped);
 			g_string_append(html, "</tr>");
 		}
 		g_string_append(html, "</table>\n");
