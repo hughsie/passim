@@ -113,6 +113,15 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 			      NULL,
 			      NULL);
 		socket_addr = g_inet_socket_address_new_from_string(host, port);
+		if (socket_addr == NULL) {
+			g_task_return_new_error(task,
+						G_IO_ERROR,
+						G_IO_ERROR_INVALID_DATA,
+						"mDNS responder returned non-numeric address '%s'",
+						host);
+			passim_avahi_service_resolver_free(task);
+			return;
+		}
 		if (g_socket_address_get_family(socket_addr) == G_SOCKET_FAMILY_IPV6) {
 			helper->address = g_strdup_printf("[%s]:%i", host, port);
 		} else {
