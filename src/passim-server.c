@@ -868,13 +868,14 @@ passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimIt
 static void
 passim_server_check_share_limit(PassimServer *self, PassimItem *item)
 {
-	/* we've shared this enough now */
+	/* we've shared this enough now; stop serving the item but keep the
+	 * on-disk copy so that an unauthenticated peer cannot evict it from
+	 * the cache simply by exhausting the share limit */
 	if (passim_item_get_share_limit(item) > 0 &&
-	    passim_item_get_share_count(item) >= passim_item_get_share_limit(item)) {
-		g_autoptr(GError) error = NULL;
-		g_debug("deleting %s as share limit reached", passim_item_get_hash(item));
-		if (!passim_server_delete_item(self, item, &error))
-			g_warning("failed: %s", error->message);
+	    passim_item_get_share_count(item) >= passim_item_get_share_limit(item) &&
+	    !passim_item_has_flag(item, PASSIM_ITEM_FLAG_DISABLED)) {
+		g_debug("disabling %s as share limit reached", passim_item_get_hash(item));
+		passim_item_add_flag(item, PASSIM_ITEM_FLAG_DISABLED);
 	}
 }
 
