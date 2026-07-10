@@ -1326,8 +1326,9 @@ passim_server_method_call(GDBusConnection *connection,
 		}
 		passim_item_set_cmdline(item, cmdline);
 
-		/* sanity check this does not contain a path */
-		if (g_strstr_len(passim_item_get_basename(item), -1, "/") != NULL) {
+		/* sanity check this exists and does not contain a path */
+		if (passim_item_get_basename(item) == NULL ||
+		    g_strstr_len(passim_item_get_basename(item), -1, "/") != NULL) {
 			g_dbus_method_invocation_return_error_literal(invocation,
 								      G_DBUS_ERROR,
 								      G_DBUS_ERROR_INVALID_ARGS,
