@@ -698,11 +698,15 @@ passim_item_get_flags_as_string(PassimItem *self)
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), NULL);
 
 	for (guint i = 0; i < 64; i++) {
+		const gchar *tmp;
 		if ((priv->flags & ((guint64)1 << i)) == 0)
+			continue;
+		tmp = passim_item_flag_to_string((guint64)1 << i);
+		if (tmp == NULL)
 			continue;
 		if (str->len > 0)
 			g_string_append(str, ",");
-		g_string_append(str, passim_item_flag_to_string((guint64)1 << i));
+		g_string_append(str, tmp);
 	}
 	if (str->len == 0)
 		g_string_append(str, passim_item_flag_to_string(PASSIM_ITEM_FLAG_NONE));
