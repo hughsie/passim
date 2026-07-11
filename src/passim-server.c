@@ -36,6 +36,7 @@ typedef struct {
 	guint timed_exit_id;
 	guint64 download_saving;
 	PassimStatus status;
+	GHashTable *client_cooldowns; /* element-type utf8:*u64 */
 } PassimServer;
 
 static void
@@ -63,6 +64,8 @@ passim_server_free(PassimServer *self)
 		g_object_unref(self->connection);
 	if (self->introspection_daemon != NULL)
 		g_dbus_node_info_unref(self->introspection_daemon);
+	if (self->client_cooldowns != NULL)
+		g_hash_table_unref(self->client_cooldowns);
 	g_free(self->root);
 	g_free(self);
 }
@@ -915,6 +918,39 @@ passim_server_is_loopback(const gchar *inet_addr)
 	return g_inet_address_get_is_loopback(address);
 }
 
+static gboolean
+passim_server_check_client_cooldown(PassimServer *self,
+				    const gchar *addr,
+				    const gchar *hash,
+				    GError **error)
+{
+	gint64 *ts;
+	gint64 now = g_get_monotonic_time();
+	g_autofree gchar *key = g_strdup_printf("%s;%s", addr, hash);
+
+	/* already exists? */
+	ts = g_hash_table_lookup(self->client_cooldowns, key);
+	if (ts != NULL) {
+		gint64 delta = (now - *ts) / G_USEC_PER_SEC;
+		if (delta < passim_config_get_cooldown(self->kf)) {
+			g_set_error(error,
+				    G_IO_ERROR,
+				    G_IO_ERROR_PERMISSION_DENIED,
+				    "%s already requested %s only %u seconds ago",
+				    addr,
+				    hash,
+				    (guint)delta);
+			return FALSE;
+		}
+	}
+
+	/* update or add */
+	ts = g_new0(gint64, 1);
+	*ts = now;
+	g_hash_table_insert(self->client_cooldowns, g_steal_pointer(&key), ts);
+	return TRUE;
+}
+
 static void
 passim_server_handler_cb(SoupServer *server,
 			 SoupServerMessage *msg,
@@ -932,6 +968,7 @@ passim_server_handler_cb(SoupServer *server,
 	g_autofree gchar *hash = NULL;
 	g_autofree gchar *inet_addrstr = NULL;
 	g_auto(GStrv) request = NULL;
+	g_autoptr(GError) error_local = NULL;
 	g_autoptr(PassimServerContext) ctx = g_new0(PassimServerContext, 1);
 
 	/* only GET supported */
@@ -1031,6 +1068,17 @@ passim_server_handler_cb(SoupServer *server,
 					     SOUP_STATUS_NOT_ACCEPTABLE,
 					     "sha256 hash is malformed");
 		return;
+	}
+
+	/* limit the number of times the same client can request the same file */
+	if (!is_loopback) {
+		if (!passim_server_check_client_cooldown(self, inet_addrstr, hash, &error_local)) {
+			passim_server_msg_send_error(self,
+						     msg,
+						     SOUP_STATUS_FORBIDDEN,
+						     error_local->message);
+			return;
+		}
 	}
 
 	/* already exists locally */
@@ -1203,6 +1251,7 @@ passim_server_check_item_age_cb(gpointer user_data)
 {
 	PassimServer *self = (PassimServer *)user_data;
 	passim_server_check_item_age(self);
+	g_hash_table_remove_all(self->client_cooldowns);
 	return G_SOURCE_CONTINUE;
 }
 
@@ -1695,6 +1744,7 @@ main(int argc, char *argv[])
 	if (timed_exit)
 		self->timed_exit_id = g_timeout_add_seconds(10, passim_server_timed_exit_cb, self);
 	self->avahi = passim_avahi_new(self->kf);
+	self->client_cooldowns = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 	self->port = passim_config_get_port(self->kf);
 	self->use_ipv6 = passim_config_get_ipv6(self->kf);
 	self->root = passim_config_get_path(self->kf);

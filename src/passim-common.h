@@ -18,6 +18,8 @@ gboolean
 passim_config_get_ipv6(GKeyFile *kf);
 gsize
 passim_config_get_max_item_size(GKeyFile *kf);
+gint
+passim_config_get_cooldown(GKeyFile *kf);
 gdouble
 passim_config_get_carbon_cost(GKeyFile *kf);
 gchar *
