@@ -16,6 +16,7 @@
 #define PASSIM_CONFIG_PATH	    "Path"
 #define PASSIM_CONFIG_MAX_ITEM_SIZE "MaxItemSize"
 #define PASSIM_CONFIG_CARBON_COST   "CarbonCost"
+#define PASSIM_CONFIG_COOLDOWN   "Cooldown"
 
 const gchar *
 passim_status_to_string(PassimStatus status)
@@ -52,6 +53,12 @@ passim_config_load(GError **error)
 				      PASSIM_CONFIG_MAX_ITEM_SIZE,
 				      100 * 1024 * 1024);
 	}
+	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_COOLDOWN, NULL)) {
+		g_key_file_set_integer(kf,
+				      PASSIM_CONFIG_GROUP,
+				      PASSIM_CONFIG_COOLDOWN,
+				      3600);
+	}
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, NULL)) {
 		g_autofree gchar *path =
 		    g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "data", NULL);
@@ -82,6 +89,12 @@ gsize
 passim_config_get_max_item_size(GKeyFile *kf)
 {
 	return g_key_file_get_uint64(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_MAX_ITEM_SIZE, NULL);
+}
+
+gint
+passim_config_get_cooldown(GKeyFile *kf)
+{
+	return g_key_file_get_integer(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_COOLDOWN, NULL);
 }
 
 gdouble
