@@ -1,0 +1,3 @@
+[Test]
+Type=session
+Exec=@installed_tests_execdir@/passim-self-test

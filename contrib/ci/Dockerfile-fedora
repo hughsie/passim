@@ -7,6 +7,8 @@ RUN dnf -y install \
 	gobject-introspection-devel \
 	libsoup3-devel \
 	meson \
+	python3-dbus \
+	python3-dbusmock \
 	redhat-rpm-config \
 	shared-mime-info \
 	systemd
