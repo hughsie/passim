@@ -1,2 +1,3 @@
-option('systemd_root_prefix', type: 'string', value: '', description: 'Directory to base systemd’s installation directories on')
+option('systemd_root_prefix', type: 'string', value: '', description: 'Directory to base systemd installation directories on')
 option('introspection', type : 'feature', description : 'generate GObject Introspection data')
+option('installed_tests', type : 'boolean', value : true, description : 'install distributed tests')

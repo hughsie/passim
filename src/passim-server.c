@@ -34,6 +34,7 @@ typedef struct {
 	guint owner_id;
 	guint poll_item_age_id;
 	guint timed_exit_id;
+	gboolean insecure;
 	guint64 download_saving;
 	PassimStatus status;
 	GHashTable *client_cooldowns; /* element-type utf8:*u64 */
@@ -1301,7 +1302,7 @@ passim_server_sender_check_uid(PassimServer *self, const gchar *sender, GError *
 		return FALSE;
 	}
 	g_variant_get(val, "(u)", &value);
-	if (value != 0) {
+	if (value != 0 && !self->insecure) {
 		g_set_error(error,
 			    G_IO_ERROR,
 			    G_IO_ERROR_PERMISSION_DENIED,
@@ -1705,6 +1706,7 @@ main(int argc, char *argv[])
 {
 	gboolean version = FALSE;
 	gboolean timed_exit = FALSE;
+	gboolean insecure = FALSE;
 	g_autoptr(GError) error = NULL;
 	g_autoptr(GOptionContext) context = g_option_context_new(NULL);
 	g_autoptr(GSource) unix_signal_source = g_unix_signal_source_new(SIGINT);
@@ -1715,6 +1717,7 @@ main(int argc, char *argv[])
 	const GOptionEntry options[] = {
 	    {"version", '\0', 0, G_OPTION_ARG_NONE, &version, "Show project version", NULL},
 	    {"timed-exit", '\0', 0, G_OPTION_ARG_NONE, &timed_exit, "Exit after a delay", NULL},
+	    {"insecure", '\0', 0, G_OPTION_ARG_NONE, &insecure, "Skip UID checks", NULL},
 	    {NULL}};
 
 	(void)g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
@@ -1743,6 +1746,7 @@ main(int argc, char *argv[])
 	    g_timeout_add_seconds(60 * 60, passim_server_check_item_age_cb, self);
 	if (timed_exit)
 		self->timed_exit_id = g_timeout_add_seconds(10, passim_server_timed_exit_cb, self);
+	self->insecure = insecure;
 	self->avahi = passim_avahi_new(self->kf);
 	self->client_cooldowns = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 	self->port = passim_config_get_port(self->kf);
