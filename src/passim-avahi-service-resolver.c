@@ -29,6 +29,7 @@ typedef struct {
 	gchar *object_path;
 	gchar *address;
 	gulong signal_id;
+	gboolean resolved;
 	GDBusConnection *connection; /* no-ref -- not needed with new Avahi */
 	guint subscription_id;	     /* not needed with new Avahi */
 	GPtrArray *signals; /* element-type PassimAvahiSignal -- not needed with new Avahi */
@@ -89,9 +90,12 @@ static void
 passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVariant *parameters)
 {
 	PassimAvahiServiceResolverHelper *helper = g_task_get_task_data(task);
+	if (helper->resolved)
+		return;
 	if (g_strcmp0(signal_name, "Failure") == 0) {
 		const gchar *errmsg = NULL;
 		g_variant_get(parameters, "(&s)", &errmsg);
+		helper->resolved = TRUE;
 		g_task_return_new_error(task, G_IO_ERROR, G_IO_ERROR_FAILED, "%s", errmsg);
 		return;
 	}
@@ -114,6 +118,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 			      NULL);
 		socket_addr = g_inet_socket_address_new_from_string(host, port);
 		if (socket_addr == NULL) {
+			helper->resolved = TRUE;
 			g_task_return_new_error(task,
 						G_IO_ERROR,
 						G_IO_ERROR_INVALID_DATA,
@@ -127,6 +132,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 		} else {
 			helper->address = g_strdup_printf("%s:%i", host, port);
 		}
+		helper->resolved = TRUE;
 		passim_avahi_service_resolver_free(task);
 		return;
 	}
