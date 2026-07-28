@@ -97,6 +97,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 		g_variant_get(parameters, "(&s)", &errmsg);
 		helper->resolved = TRUE;
 		g_task_return_new_error(task, G_IO_ERROR, G_IO_ERROR_FAILED, "%s", errmsg);
+		passim_avahi_service_resolver_free(task);
 		return;
 	}
 	if (g_strcmp0(signal_name, "Found") == 0) {
