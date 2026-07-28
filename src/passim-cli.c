@@ -169,6 +169,13 @@ typedef struct {
 	gchar *value;
 } PassimItemAttr;
 
+static void
+passim_item_attr_free(PassimItemAttr *attr)
+{
+	g_free(attr->value);
+	g_free(attr);
+}
+
 static gchar *
 passim_cli_item_flag_to_string(PassimItemFlags flags)
 {
@@ -189,7 +196,7 @@ passim_cli_item_flag_to_string(PassimItemFlags flags)
 static GPtrArray *
 passim_cli_item_to_attrs(PassimItem *item)
 {
-	GPtrArray *array = g_ptr_array_new_with_free_func(g_free);
+	GPtrArray *array = g_ptr_array_new_with_free_func((GDestroyNotify)passim_item_attr_free);
 
 	if (passim_item_get_basename(item) != NULL) {
 		PassimItemAttr *attr = g_new0(PassimItemAttr, 1);
