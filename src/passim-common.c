@@ -33,10 +33,10 @@ passim_status_to_string(PassimStatus status)
 }
 
 GKeyFile *
-passim_config_load(GError **error)
+passim_config_load(const gchar *sysconfdir, const gchar *localstatedir, GError **error)
 {
 	g_autoptr(GKeyFile) kf = g_key_file_new();
-	g_autofree gchar *fn = g_build_filename(PACKAGE_SYSCONFDIR, "passim.conf", NULL);
+	g_autofree gchar *fn = g_build_filename(sysconfdir, "passim.conf", NULL);
 
 	if (g_file_test(fn, G_FILE_TEST_EXISTS)) {
 		if (!g_key_file_load_from_file(kf, fn, G_KEY_FILE_NONE, error))
@@ -58,7 +58,7 @@ passim_config_load(GError **error)
 	}
 	if (!g_key_file_has_key(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, NULL)) {
 		g_autofree gchar *path =
-		    g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "data", NULL);
+		    g_build_filename(localstatedir, "lib", PACKAGE_NAME, "data", NULL);
 		g_key_file_set_string(kf, PASSIM_CONFIG_GROUP, PASSIM_CONFIG_PATH, path);
 	}
 

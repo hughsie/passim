@@ -44,16 +44,10 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         builddir = os.environ.get("PASSIM_BUILDDIR", "")
         srcdir = os.environ.get("PASSIM_SRCDIR", "")
 
-        config_h = os.path.join(builddir, "config.h")
-        cls.sysconfdir = cls._parse_config_h(config_h, "PACKAGE_SYSCONFDIR")
-        cls.localstatedir = cls._parse_config_h(config_h, "PACKAGE_LOCALSTATEDIR")
-        cls.datadir = cls._parse_config_h(config_h, "PACKAGE_DATADIR")
-
         cls._setup_directories()
         cls._seed_audit_log()
         cls._setup_sysconfpkgdir()
         cls._setup_config()
-        cls._setup_tls_backups()
         cls._install_dbus_interface(srcdir)
         cls._start_mock_avahi()
         cls._start_daemon(builddir)
@@ -84,23 +78,21 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
 
     @classmethod
     def _setup_directories(cls):
-        cls.data_path = os.path.join(cls.localstatedir, "lib", "passim", "data")
+        cls.data_path = os.path.join(cls.tmpdir, "lib", "passim", "data")
         os.makedirs(cls.data_path, exist_ok=True)
         cls.test_file = os.path.join(
             cls.data_path, f"{cls.test_hash}-{cls.TEST_BASENAME}"
         )
-        cls.addClassCleanup(cls._remove_if_exists, cls.test_file)
         with open(cls.test_file, "wb") as f:
             f.write(cls.TEST_CONTENT)
 
-        cls.log_path = os.path.join(cls.tmpdir, "logs")
-        os.makedirs(cls.log_path, exist_ok=True)
+        os.makedirs(os.path.join(cls.tmpdir, "log", "passim"), exist_ok=True)
 
     SEEDED_DOWNLOAD_SIZE = 42000
 
     @classmethod
     def _seed_audit_log(cls):
-        audit_file = os.path.join(cls.log_path, "audit.log")
+        audit_file = os.path.join(cls.tmpdir, "log", "passim", "audit.log")
         fake_hash = "a" * 64
         line = f"2026-01-01T00:00:00Z SHARE hash={fake_hash},basename=seeded.bin,size={cls.SEEDED_DOWNLOAD_SIZE},ipaddr=127.0.0.1\n"
         with open(audit_file, "w") as f:
@@ -118,66 +110,34 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             f.write(cls.SYSCONFPKG_CONTENT)
         cls.sysconfpkg_hash = hashlib.sha256(cls.SYSCONFPKG_CONTENT).hexdigest()
 
-        passim_d = os.path.join(cls.sysconfdir, "passim.d")
+        passim_d = os.path.join(cls.tmpdir, "passim.d")
         os.makedirs(passim_d, exist_ok=True)
 
         fd, cls.sysconfpkg_conf = tempfile.mkstemp(
             suffix=".conf", prefix="passim-test-", dir=passim_d
         )
-        cls.addClassCleanup(cls._remove_if_exists, cls.sysconfpkg_conf)
         with os.fdopen(fd, "w") as f:
             f.write(f"[passim]\nPath={cls.sysconfpkg_data}\n")
 
         fd2, missing_conf = tempfile.mkstemp(
             suffix=".conf", prefix="passim-missing-", dir=passim_d
         )
-        cls.addClassCleanup(cls._remove_if_exists, missing_conf)
         with os.fdopen(fd2, "w") as f:
             f.write("[passim]\nPath=/nonexistent/path\n")
 
     @classmethod
     def _setup_config(cls):
-        conf_dir = cls.sysconfdir
-        os.makedirs(conf_dir, exist_ok=True)
-        cls.conf_file = os.path.join(conf_dir, "passim.conf")
-        conf_existed = os.path.exists(cls.conf_file)
-        if conf_existed:
-            cls.conf_backup = os.path.join(cls.tmpdir, "passim.conf.bak")
-            shutil.copy2(cls.conf_file, cls.conf_backup)
-            cls.addClassCleanup(shutil.move, cls.conf_backup, cls.conf_file)
-        else:
-            cls.addClassCleanup(cls._remove_if_exists, cls.conf_file)
-        with open(cls.conf_file, "w") as f:
+        with open(os.path.join(cls.tmpdir, "passim.conf"), "w") as f:
             f.write(f"[daemon]\nPort={cls.DAEMON_PORT}\n")
-
-    @staticmethod
-    def _remove_if_exists(path):
-        if os.path.exists(path):
-            os.unlink(path)
-
-    @classmethod
-    def _setup_tls_backups(cls):
-        tls_dir = os.path.join(cls.localstatedir, "lib", "passim")
-        for fn in ("secret.key", "cert.pem"):
-            path = os.path.join(tls_dir, fn)
-            if os.path.exists(path):
-                backup = os.path.join(cls.tmpdir, fn + ".bak")
-                shutil.copy2(path, backup)
-                cls.addClassCleanup(shutil.move, backup, path)
-            else:
-                cls.addClassCleanup(cls._remove_if_exists, path)
 
     @classmethod
     def _install_dbus_interface(cls, srcdir):
-        dbus_iface_dir = os.path.join(cls.datadir, "dbus-1", "interfaces")
+        dbus_iface_dir = os.path.join(cls.tmpdir, "dbus-1", "interfaces")
         os.makedirs(dbus_iface_dir, exist_ok=True)
-        dbus_iface_dst = os.path.join(
-            dbus_iface_dir, "org.freedesktop.Passim.xml"
+        shutil.copy2(
+            os.path.join(srcdir, "org.freedesktop.Passim.xml"),
+            os.path.join(dbus_iface_dir, "org.freedesktop.Passim.xml"),
         )
-        dbus_iface_src = os.path.join(srcdir, "org.freedesktop.Passim.xml")
-        if not os.path.exists(dbus_iface_dst):
-            cls.addClassCleanup(cls._remove_if_exists, dbus_iface_dst)
-            shutil.copy2(dbus_iface_src, dbus_iface_dst)
 
     @classmethod
     def _start_mock_avahi(cls):
@@ -220,9 +180,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             ("AddServiceSubtype", "iiussss"),
             ("Commit", ""),
         ]:
-            eg_mock.AddMethod(
-                "org.freedesktop.Avahi.EntryGroup", method, sig, "", ""
-            )
+            eg_mock.AddMethod("org.freedesktop.Avahi.EntryGroup", method, sig, "", "")
 
         test_hash_prefix = cls.test_hash[:60]
         avahi_mock.AddMethod(
@@ -232,7 +190,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "o",
             f'if "_{test_hash_prefix}" in args[2]:\n'
             '    ret = "/org/freedesktop/Avahi/ServiceBrowser/1"\n'
-            'else:\n'
+            "else:\n"
             '    ret = "/org/freedesktop/Avahi/ServiceBrowser/2"',
         )
 
@@ -266,14 +224,14 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "Start",
             "",
             "",
-            'import dbus\n'
-            'self.EmitSignal('
+            "import dbus\n"
+            "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceBrowser", "ItemNew", "iisssu",'
-            ' [dbus.Int32(-1), dbus.Int32(0),'
+            " [dbus.Int32(-1), dbus.Int32(0),"
             ' dbus.String("Passim-Peer"),'
             ' dbus.String("_cache._tcp"),'
             ' dbus.String("local"), dbus.UInt32(0)])\n'
-            'self.EmitSignal('
+            "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceBrowser", "AllForNow", "", [])',
         )
 
@@ -287,7 +245,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "Start",
             "",
             "",
-            'self.EmitSignal('
+            "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceBrowser", "AllForNow", "", [])',
         )
 
@@ -316,62 +274,54 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "Start",
             "",
             "",
-            'import dbus\n'
-            'self.EmitSignal('
+            "import dbus\n"
+            "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceResolver", "Found",'
             ' "iissssisqaayu",'
-            ' [dbus.Int32(-1), dbus.Int32(0),'
+            " [dbus.Int32(-1), dbus.Int32(0),"
             ' dbus.String("Passim-Peer"),'
             ' dbus.String("_cache._tcp"),'
             ' dbus.String("local"),'
             ' dbus.String("peer.local"), dbus.Int32(0),'
             ' dbus.String("127.0.0.1"),'
-            f' dbus.UInt16({cls.DAEMON_PORT}),'
+            f" dbus.UInt16({cls.DAEMON_PORT}),"
             ' dbus.Array([], signature="ay"),'
-            ' dbus.UInt32(0)])',
+            " dbus.UInt32(0)])",
         )
-        sr_mock.AddMethod(
-            "org.freedesktop.Avahi.ServiceResolver", "Free", "", "", ""
-        )
+        sr_mock.AddMethod("org.freedesktop.Avahi.ServiceResolver", "Free", "", "", "")
 
     @classmethod
     def _start_daemon(cls, builddir):
         """Start the passimd binary."""
         daemon_path = os.path.join(builddir, "src", "passimd")
         env = os.environ.copy()
-        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get(
-            "DBUS_SYSTEM_BUS_ADDRESS", ""
-        )
-        env["LOGS_DIRECTORY"] = cls.log_path
+        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
+        env["LOCALSTATEDIR"] = cls.tmpdir
+        env["SYSCONFDIR"] = cls.tmpdir
+        env["DATADIR"] = cls.tmpdir
         env["G_MESSAGES_DEBUG"] = "all"
         env["G_DEBUG"] = ""
 
         cls.daemon_proc = subprocess.Popen(
             [daemon_path, "--insecure"],
             env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            # stdout=subprocess.DEVNULL,
+            # stderr=subprocess.DEVNULL,
         )
 
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             try:
-                s = socket.create_connection(
-                    ("127.0.0.1", cls.DAEMON_PORT), timeout=1
-                )
+                s = socket.create_connection(("127.0.0.1", cls.DAEMON_PORT), timeout=1)
                 s.close()
                 return
             except OSError:
                 rc = cls.daemon_proc.poll()
                 if rc is not None:
-                    raise RuntimeError(
-                        f"passimd exited with code {rc}"
-                    ) from None
+                    raise RuntimeError(f"passimd exited with code {rc}") from None
                 time.sleep(0.2)
 
-        raise TimeoutError(
-            f"passimd did not start listening on port {cls.DAEMON_PORT}"
-        )
+        raise TimeoutError(f"passimd did not start listening on port {cls.DAEMON_PORT}")
 
     def _https_get(self, path, expected_status=200):
         """Make an HTTPS GET request to the daemon."""
@@ -418,9 +368,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         self.assertEqual(status, 400)
 
     def test_sha256_required(self):
-        status, body, _ = self._https_get(
-            "/somefile?foo=bar", expected_status=400
-        )
+        status, body, _ = self._https_get("/somefile?foo=bar", expected_status=400)
         self.assertEqual(status, 400)
 
     def test_duplicate_sha256(self):
@@ -431,9 +379,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         self.assertEqual(status, 400)
 
     def test_malformed_sha256(self):
-        status, body, _ = self._https_get(
-            "/file?sha256=notahex", expected_status=406
-        )
+        status, body, _ = self._https_get("/file?sha256=notahex", expected_status=406)
         self.assertEqual(status, 406)
 
     def test_invalid_localhost_param(self):
@@ -555,9 +501,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         if not helper or not os.path.exists(helper):
             self.skipTest("PASSIM_CLIENT_TEST_HELPER not set or not found")
         env = os.environ.copy()
-        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get(
-            "DBUS_SYSTEM_BUS_ADDRESS", ""
-        )
+        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
         result = subprocess.run(
             [helper],
             env=env,
@@ -581,9 +525,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         if not cli or not os.path.exists(cli):
             self.skipTest("PASSIM_CLI not set or not found")
         env = os.environ.copy()
-        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get(
-            "DBUS_SYSTEM_BUS_ADDRESS", ""
-        )
+        env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ.get("DBUS_SYSTEM_BUS_ADDRESS", "")
         return subprocess.run(
             [cli] + args,
             env=env,

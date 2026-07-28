@@ -11,7 +11,7 @@
 const gchar *
 passim_status_to_string(PassimStatus status);
 GKeyFile *
-passim_config_load(GError **error);
+passim_config_load(const gchar *sysconfdir, const gchar *localstatedir, GError **error);
 guint16
 passim_config_get_port(GKeyFile *kf);
 gboolean

@@ -17,6 +17,13 @@
 #include "passim-common.h"
 #include "passim-gnutls.h"
 
+typedef enum {
+	PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+	PASSIM_SERVER_PATH_IDX_SYSCONFDIR,
+	PASSIM_SERVER_PATH_IDX_DATADIR,
+	PASSIM_SERVER_PATH_IDX_LAST,
+} PassimServerPathIdx;
+
 typedef struct {
 	GDBusConnection *connection;
 	GDBusNodeInfo *introspection_daemon;
@@ -38,6 +45,7 @@ typedef struct {
 	guint64 download_saving;
 	PassimStatus status;
 	GHashTable *client_cooldowns; /* element-type utf8:*u64 */
+	gchar *paths[PASSIM_SERVER_PATH_IDX_LAST + 1];
 } PassimServer;
 
 static void
@@ -67,6 +75,8 @@ passim_server_free(PassimServer *self)
 		g_dbus_node_info_unref(self->introspection_daemon);
 	if (self->client_cooldowns != NULL)
 		g_hash_table_unref(self->client_cooldowns);
+	for (guint i = 0; i < PASSIM_SERVER_PATH_IDX_LAST; i++)
+		g_free(self->paths[i]);
 	g_free(self->root);
 	g_free(self);
 }
@@ -173,13 +183,28 @@ passim_server_avahi_register(PassimServer *self, GError **error)
 	return TRUE;
 }
 
-static gchar *
-passim_server_get_logdir(void)
+static void
+passim_server_add_path(PassimServer *self,
+		       PassimServerPathIdx path,
+		       const gchar *env_key,
+		       const gchar *value_default)
 {
-	const gchar *logs_directory = g_getenv("LOGS_DIRECTORY");
-	if (logs_directory != NULL)
-		return g_strdup(logs_directory);
-	return g_build_filename(PACKAGE_LOCALSTATEDIR, "log", PACKAGE_NAME, NULL);
+	const gchar *env_value = g_getenv(env_key);
+	g_return_if_fail(self->paths[path] == NULL);
+	self->paths[path] = g_strdup(env_value != NULL ? env_value : value_default);
+}
+
+static gchar *
+passim_server_build_path(PassimServer *self, PassimServerPathIdx pathidx, ...)
+{
+	va_list args;
+	gchar *path;
+
+	va_start(args, pathidx);
+	path = g_build_filename_valist(self->paths[pathidx], &args);
+	va_end(args);
+
+	return path;
 }
 
 static gboolean
@@ -227,15 +252,18 @@ static gboolean
 passim_server_update_download_saving(PassimServer *self, GError **error)
 {
 	g_autofree gchar *filename = NULL;
-	g_autofree gchar *path = NULL;
 	g_autoptr(GDataInputStream) dstream = NULL;
 	g_autoptr(GError) error_local = NULL;
 	g_autoptr(GFile) file = NULL;
 	g_autoptr(GFileInputStream) istream = NULL;
 
 	/* open file for reading */
-	path = passim_server_get_logdir();
-	filename = g_build_filename(path, "audit.log", NULL);
+	filename = passim_server_build_path(self,
+					    PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+					    "log",
+					    PACKAGE_NAME,
+					    "audit.log",
+					    NULL);
 	file = g_file_new_for_path(filename);
 	istream = g_file_read(file, NULL, &error_local);
 	if (istream == NULL) {
@@ -282,7 +310,11 @@ passim_server_eventlog(PassimServer *self, const gchar *type, const gchar *value
 	g_autoptr(GFileOutputStream) ostream = NULL;
 
 	/* create logdir */
-	path = passim_server_get_logdir();
+	path = passim_server_build_path(self,
+					PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+					"log",
+					PACKAGE_NAME,
+					NULL);
 	if (!passim_mkdir(path, error))
 		return FALSE;
 
@@ -562,7 +594,8 @@ passim_server_sysconfpkgdir_changed_cb(GFileMonitor *monitor,
 static gboolean
 passim_server_sysconfpkgdir_watch(PassimServer *self, GError **error)
 {
-	g_autofree gchar *sysconfpkgdir = g_build_filename(PACKAGE_SYSCONFDIR, "passim.d", NULL);
+	g_autofree gchar *sysconfpkgdir =
+	    passim_server_build_path(self, PASSIM_SERVER_PATH_IDX_SYSCONFDIR, "passim.d", NULL);
 	g_autoptr(GFile) file = g_file_new_for_path(sysconfpkgdir);
 
 	self->sysconfpkg_monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, NULL, error);
@@ -579,7 +612,8 @@ static gboolean
 passim_server_sysconfpkgdir_scan(PassimServer *self, GError **error)
 {
 	const gchar *fn;
-	g_autofree gchar *sysconfpkgdir = g_build_filename(PACKAGE_SYSCONFDIR, "passim.d", NULL);
+	g_autofree gchar *sysconfpkgdir =
+	    passim_server_build_path(self, PASSIM_SERVER_PATH_IDX_SYSCONFDIR, "passim.d", NULL);
 	g_autoptr(GDir) dir = NULL;
 	g_autoptr(GList) items = g_hash_table_get_values(self->items);
 
@@ -1009,7 +1043,11 @@ passim_server_handler_cb(SoupServer *server,
 		return;
 	}
 	if (g_strcmp0(path, "/favicon.ico") == 0 || g_strcmp0(path, "/style.css") == 0) {
-		g_autofree gchar *fn = g_build_filename(PACKAGE_DATADIR, PACKAGE_NAME, path, NULL);
+		g_autofree gchar *fn = passim_server_build_path(self,
+								PASSIM_SERVER_PATH_IDX_DATADIR,
+								PACKAGE_NAME,
+								path,
+								NULL);
 		if (!is_loopback) {
 			passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
 			return;
@@ -1149,7 +1187,12 @@ passim_server_publish_file(PassimServer *self, GBytes *blob, PassimItem *item, G
 	}
 	hashed_filename = g_strdup_printf("%s-%s", hash, passim_item_get_basename(item));
 
-	localstate_dir = g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "data", NULL);
+	localstate_dir = passim_server_build_path(self,
+						  PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+						  "lib",
+						  PACKAGE_NAME,
+						  "data",
+						  NULL);
 	if (!passim_mkdir(localstate_dir, error))
 		return FALSE;
 	localstate_filename = g_build_filename(localstate_dir, hashed_filename, NULL);
@@ -1605,11 +1648,12 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 	g_autofree gchar *introspection_xml = NULL;
 
 	/* load introspection from file */
-	introspection_fn = g_build_filename(PACKAGE_DATADIR,
-					    "dbus-1",
-					    "interfaces",
-					    PASSIM_DBUS_INTERFACE ".xml",
-					    NULL);
+	introspection_fn = passim_server_build_path(self,
+						    PASSIM_SERVER_PATH_IDX_DATADIR,
+						    "dbus-1",
+						    "interfaces",
+						    PASSIM_DBUS_INTERFACE ".xml",
+						    NULL);
 	if (!g_file_get_contents(introspection_fn, &introspection_xml, NULL, error)) {
 		g_prefix_error(error, "failed to read introspection: ");
 		return FALSE;
@@ -1636,15 +1680,19 @@ passim_server_start_dbus(PassimServer *self, GError **error)
 }
 
 static GTlsCertificate *
-passim_server_load_tls_certificate(GError **error)
+passim_server_load_tls_certificate(PassimServer *self, GError **error)
 {
 	g_autofree gchar *cert_fn = NULL;
 	g_autofree gchar *secret_fn = NULL;
 	g_autoptr(GBytes) secret_blob = NULL;
 
 	/* create secret key */
-	secret_fn =
-	    g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "secret.key", NULL);
+	secret_fn = passim_server_build_path(self,
+					     PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+					     "lib",
+					     PACKAGE_NAME,
+					     "secret.key",
+					     NULL);
 	if (!g_file_test(secret_fn, G_FILE_TEST_EXISTS)) {
 		secret_blob = passim_gnutls_create_private_key(error);
 		if (secret_blob == NULL)
@@ -1656,7 +1704,12 @@ passim_server_load_tls_certificate(GError **error)
 	}
 
 	/* create TLS cert */
-	cert_fn = g_build_filename(PACKAGE_LOCALSTATEDIR, "lib", PACKAGE_NAME, "cert.pem", NULL);
+	cert_fn = passim_server_build_path(self,
+					   PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+					   "lib",
+					   PACKAGE_NAME,
+					   "cert.pem",
+					   NULL);
 	if (!g_file_test(cert_fn, G_FILE_TEST_EXISTS)) {
 		g_autoptr(GBytes) cert_blob = NULL;
 		g_auto(gnutls_privkey_t) privkey = NULL;
@@ -1735,9 +1788,21 @@ main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	}
 
+	passim_server_add_path(self,
+			       PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR,
+			       "LOCALSTATEDIR",
+			       PACKAGE_LOCALSTATEDIR);
+	passim_server_add_path(self,
+			       PASSIM_SERVER_PATH_IDX_SYSCONFDIR,
+			       "SYSCONFDIR",
+			       PACKAGE_SYSCONFDIR);
+	passim_server_add_path(self, PASSIM_SERVER_PATH_IDX_DATADIR, "DATADIR", PACKAGE_DATADIR);
+
 	self->status = PASSIM_STATUS_STARTING;
 	self->loop = g_main_loop_new(NULL, FALSE);
-	self->kf = passim_config_load(&error);
+	self->kf = passim_config_load(self->paths[PASSIM_SERVER_PATH_IDX_SYSCONFDIR],
+				      self->paths[PASSIM_SERVER_PATH_IDX_LOCALSTATEDIR],
+				      &error);
 	if (self->kf == NULL) {
 		g_printerr("failed to load config: %s\n", error->message);
 		return 1;
@@ -1783,7 +1848,7 @@ main(int argc, char *argv[])
 	passim_server_check_item_age(self);
 
 	/* set up the webserver */
-	cert = passim_server_load_tls_certificate(&error);
+	cert = passim_server_load_tls_certificate(self, &error);
 	if (cert == NULL) {
 		g_warning("failed to load TLS cert: %s", error->message);
 		return 1;
