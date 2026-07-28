@@ -20,6 +20,28 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.12" date="2026-07-28">
+      <description>
+        <p>
+          This release adds the following features:
+        </p>
+        <ul>
+          <li>Expand test coverage from 29% to 82%</li>
+          <li>Only allow the same client to request the same file after 1h</li>
+        </ul>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Correctly handle malformed key-value pairs when parsing the audit log</li>
+          <li>Escape all strings properly when building the HTML error page</li>
+          <li>Fix a memory leak when failing to resolve a local file on fallback</li>
+          <li>Handle invalid address strings when checking for loopback</li>
+          <li>Handle non-numeric addresses from the Avahi resolver</li>
+          <li>Only unpause the HTTP message in async response paths</li>
+          <li>Reject publish requests that do not include a basename</li>
+          <li>Validate that SHA-256 hashes only contain hex characters</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.11" date="2026-04-14">
       <description>
         <p>This release fixes the following bugs:</p>
