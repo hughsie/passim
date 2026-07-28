@@ -294,7 +294,7 @@ static void
 passim_avahi_service_resolve_next(GTask *task)
 {
 	PassimAvahiFindHelper *helper = g_task_get_task_data(task);
-	PassimAvahiService *item;
+	g_autoptr(PassimAvahiService) item = NULL;
 
 	if (helper->items->len == 0) {
 		if (helper->addresses->len > 0) {
