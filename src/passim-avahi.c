@@ -258,7 +258,14 @@ passim_avahi_service_resolve_cb(GObject *source, GAsyncResult *res, gpointer use
 
 	address = passim_avahi_service_resolver_finish(res, &error);
 	if (address == NULL) {
-		g_task_return_error(task, g_steal_pointer(&error));
+		if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+			g_task_return_error(task, g_steal_pointer(&error));
+			return;
+		}
+
+		/* one unreachable peer should not abandon the others */
+		g_info("failed to resolve service, ignoring: %s", error->message);
+		passim_avahi_service_resolve_next(g_steal_pointer(&task));
 		return;
 	}
 	if (g_ptr_array_find_with_equal_func(helper->addresses, address, g_str_equal, NULL)) {
