@@ -789,6 +789,12 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             with open(downloaded, "rb") as f:
                 self.assertEqual(f.read(), self.TEST_CONTENT)
 
+    def test_cli_no_command(self):
+        """With no command we show the help rather than reading past argv."""
+        result = self._run_cli([])
+        self.assertGreater(result.returncode, 0, "killed by a signal")
+        self.assertIn("publish", result.stderr.decode())
+
     def test_cli_unknown_command(self):
         result = self._run_cli(["badcommand"])
         self.assertNotEqual(result.returncode, 0)

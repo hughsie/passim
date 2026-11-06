@@ -592,6 +592,13 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	/* no command specified -- argv[1] is the NULL terminator and there is no argv[2] */
+	if (!version && argc < 2) {
+		g_autofree gchar *help = g_option_context_get_help(context, TRUE, NULL);
+		g_printerr("%s", help);
+		return EXIT_FAILURE;
+	}
+
 	/* connect to daemon */
 	self->client = passim_client_new();
 	if (!passim_client_load(self->client, &error)) {
