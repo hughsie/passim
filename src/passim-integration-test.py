@@ -450,10 +450,24 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             except OSError:
                 rc = cls.daemon_proc.poll()
                 if rc is not None:
-                    raise RuntimeError(f"passimd exited with code {rc}") from None
+                    raise RuntimeError(
+                        f"passimd exited with code {rc}\n{cls._daemon_log_tail()}"
+                    ) from None
                 time.sleep(0.2)
 
-        raise TimeoutError(f"passimd did not start listening on port {cls.DAEMON_PORT}")
+        raise TimeoutError(
+            f"passimd did not start listening on port {cls.DAEMON_PORT}\n"
+            f"{cls._daemon_log_tail()}"
+        )
+
+    @classmethod
+    def _daemon_log_tail(cls, size=4000):
+        """Last few kB of the daemon log, which is not on the console."""
+        try:
+            with open(cls.daemon_log, "rb") as f:
+                return f.read().decode(errors="replace")[-size:]
+        except OSError as e:
+            return f"(no daemon log: {e})"
 
     def _daemon_log_offset(self):
         """Current size of the daemon log, to read only what happens next."""
