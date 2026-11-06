@@ -30,6 +30,7 @@ typedef struct {
 	gchar *address;
 	gulong signal_id;
 	gboolean resolved;
+	gboolean returned;
 	GDBusConnection *connection; /* no-ref -- not needed with new Avahi */
 	guint subscription_id;	     /* not needed with new Avahi */
 	GPtrArray *signals; /* element-type PassimAvahiSignal -- not needed with new Avahi */
@@ -62,10 +63,20 @@ passim_avahi_service_resolver_free_cb(GObject *source, GAsyncResult *res, gpoint
 	PassimAvahiServiceResolverHelper *helper = g_task_get_task_data(task);
 
 	val = g_dbus_proxy_call_finish(G_DBUS_PROXY(source), res, &error);
+
+	/* the resolver failed and the error has already been returned -- returning on the task
+	 * twice is a critical, and the daemon makes criticals fatal */
+	if (helper->returned) {
+		if (val == NULL)
+			g_debug("failed to free resolver: %s", error->message);
+		return;
+	}
 	if (val == NULL) {
+		helper->returned = TRUE;
 		g_task_return_error(task, g_steal_pointer(&error));
 		return;
 	}
+	helper->returned = TRUE;
 	g_task_return_pointer(task, g_steal_pointer(&helper->address), g_free);
 }
 
@@ -96,6 +107,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 		const gchar *errmsg = NULL;
 		g_variant_get(parameters, "(&s)", &errmsg);
 		helper->resolved = TRUE;
+		helper->returned = TRUE;
 		g_task_return_new_error(task, G_IO_ERROR, G_IO_ERROR_FAILED, "%s", errmsg);
 		passim_avahi_service_resolver_free(task);
 		return;
@@ -120,6 +132,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 		socket_addr = g_inet_socket_address_new_from_string(host, port);
 		if (socket_addr == NULL) {
 			helper->resolved = TRUE;
+			helper->returned = TRUE;
 			g_task_return_new_error(task,
 						G_IO_ERROR,
 						G_IO_ERROR_INVALID_DATA,
@@ -171,6 +184,13 @@ passim_avahi_service_resolver_start_cb(GObject *source, GAsyncResult *res, gpoin
 
 	val = g_dbus_proxy_call_finish(G_DBUS_PROXY(source), res, &error);
 	if (val == NULL) {
+		/* a signal got here first, and Free() now owns both the task and the ref */
+		if (helper->resolved) {
+			g_debug("failed to start resolver: %s", error->message);
+			return;
+		}
+		helper->resolved = TRUE;
+		helper->returned = TRUE;
 		g_task_return_error(task, g_steal_pointer(&error));
 		g_object_unref(task);
 		return;
