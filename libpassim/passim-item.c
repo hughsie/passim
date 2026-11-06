@@ -175,11 +175,17 @@ guint32
 passim_item_get_age(PassimItem *self)
 {
 	PassimItemPrivate *priv = GET_PRIVATE(self);
+	GTimeSpan delta;
 	g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
 	g_return_val_if_fail(PASSIM_IS_ITEM(self), 0);
 	if (priv->ctime == NULL)
 		return 0;
-	return g_date_time_difference(dt_now, priv->ctime) / G_TIME_SPAN_SECOND;
+
+	/* the file was created in the future, e.g. the system clock was changed */
+	delta = g_date_time_difference(dt_now, priv->ctime);
+	if (delta < 0)
+		return 0;
+	return delta / G_TIME_SPAN_SECOND;
 }
 
 /**
