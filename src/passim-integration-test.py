@@ -38,6 +38,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
     def setUpClass(cls):
         cls.start_system_bus()
         cls.test_hash = hashlib.sha256(cls.TEST_CONTENT).hexdigest()
+        cls.unresolvable_hash = "e" * 64
         cls.tmpdir = tempfile.mkdtemp(prefix="passim-test-")
         cls.addClassCleanup(shutil.rmtree, cls.tmpdir, ignore_errors=True)
 
@@ -97,6 +98,8 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         line = f"2026-01-01T00:00:00Z SHARE hash={fake_hash},basename=seeded.bin,size={cls.SEEDED_DOWNLOAD_SIZE},ipaddr=127.0.0.1\n"
         with open(audit_file, "w") as f:
             f.write(line)
+
+    UNRESOLVABLE_PEER = "Passim-Unresolvable"
 
     SYSCONFPKG_CONTENT = b"sysconfpkgdir test file content"
     SYSCONFPKG_BASENAME = "sysconfpkg-test.bin"
@@ -183,6 +186,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             eg_mock.AddMethod("org.freedesktop.Avahi.EntryGroup", method, sig, "", "")
 
         test_hash_prefix = cls.test_hash[:60]
+        unresolvable_prefix = cls.unresolvable_hash[:60]
         avahi_mock.AddMethod(
             "org.freedesktop.Avahi.Server2",
             "ServiceBrowserPrepare",
@@ -190,6 +194,8 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "o",
             f'if "_{test_hash_prefix}" in args[2]:\n'
             '    ret = "/org/freedesktop/Avahi/ServiceBrowser/1"\n'
+            f'elif "_{unresolvable_prefix}" in args[2]:\n'
+            '    ret = "/org/freedesktop/Avahi/ServiceBrowser/3"\n'
             "else:\n"
             '    ret = "/org/freedesktop/Avahi/ServiceBrowser/2"',
         )
@@ -197,6 +203,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         for sb_path in [
             "/org/freedesktop/Avahi/ServiceBrowser/1",
             "/org/freedesktop/Avahi/ServiceBrowser/2",
+            "/org/freedesktop/Avahi/ServiceBrowser/3",
         ]:
             avahi_mock.AddObject(
                 sb_path,
@@ -249,13 +256,59 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             '"org.freedesktop.Avahi.ServiceBrowser", "AllForNow", "", [])',
         )
 
+        sb3_obj = bus.get_object(
+            "org.freedesktop.Avahi",
+            "/org/freedesktop/Avahi/ServiceBrowser/3",
+        )
+        sb3_mock = dbus.Interface(sb3_obj, dbusmock.MOCK_IFACE)
+        sb3_mock.AddMethod(
+            "org.freedesktop.Avahi.ServiceBrowser",
+            "Start",
+            "",
+            "",
+            "import dbus\n"
+            "self.EmitSignal("
+            '"org.freedesktop.Avahi.ServiceBrowser", "ItemNew", "iisssu",'
+            " [dbus.Int32(-1), dbus.Int32(0),"
+            f' dbus.String("{cls.UNRESOLVABLE_PEER}"),'
+            ' dbus.String("_cache._tcp"),'
+            ' dbus.String("local"), dbus.UInt32(0)])\n'
+            "self.EmitSignal("
+            '"org.freedesktop.Avahi.ServiceBrowser", "AllForNow", "", [])',
+        )
+
         avahi_mock.AddMethod(
             "org.freedesktop.Avahi.Server2",
             "ServiceResolverPrepare",
             "iisssiu",
             "o",
-            'ret = "/org/freedesktop/Avahi/ServiceResolver/1"',
+            f'if args[2] == "{cls.UNRESOLVABLE_PEER}":\n'
+            '    ret = "/org/freedesktop/Avahi/ServiceResolver/2"\n'
+            "else:\n"
+            '    ret = "/org/freedesktop/Avahi/ServiceResolver/1"',
         )
+
+        avahi_mock.AddObject(
+            "/org/freedesktop/Avahi/ServiceResolver/2",
+            "org.freedesktop.Avahi.ServiceResolver",
+            {},
+            [],
+        )
+        sr2_obj = bus.get_object(
+            "org.freedesktop.Avahi",
+            "/org/freedesktop/Avahi/ServiceResolver/2",
+        )
+        sr2_mock = dbus.Interface(sr2_obj, dbusmock.MOCK_IFACE)
+        sr2_mock.AddMethod(
+            "org.freedesktop.Avahi.ServiceResolver",
+            "Start",
+            "",
+            "",
+            "self.EmitSignal("
+            '"org.freedesktop.Avahi.ServiceResolver", "Failure", "s",'
+            ' ["Timeout reached"])',
+        )
+        sr2_mock.AddMethod("org.freedesktop.Avahi.ServiceResolver", "Free", "", "", "")
 
         avahi_mock.AddObject(
             "/org/freedesktop/Avahi/ServiceResolver/1",
@@ -302,11 +355,14 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         env["G_MESSAGES_DEBUG"] = "all"
         env["G_DEBUG"] = ""
 
+        cls.daemon_log = os.path.join(cls.tmpdir, "passimd.log")
+        cls.daemon_log_fd = open(cls.daemon_log, "wb")
+        cls.addClassCleanup(cls.daemon_log_fd.close)
         cls.daemon_proc = subprocess.Popen(
             [daemon_path, "--insecure"],
             env=env,
-            # stdout=subprocess.DEVNULL,
-            # stderr=subprocess.DEVNULL,
+            stdout=cls.daemon_log_fd,
+            stderr=subprocess.STDOUT,
         )
 
         deadline = time.monotonic() + 10
@@ -322,6 +378,23 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
                 time.sleep(0.2)
 
         raise TimeoutError(f"passimd did not start listening on port {cls.DAEMON_PORT}")
+
+    def _daemon_log_offset(self):
+        """Current size of the daemon log, to read only what happens next."""
+        return os.path.getsize(self.daemon_log)
+
+    def _daemon_log_since(self, offset, needle=None, timeout=1.0):
+        """Daemon log written after @offset, waiting for @needle to show up."""
+        deadline = time.monotonic() + timeout
+        while True:
+            with open(self.daemon_log, "rb") as f:
+                f.seek(offset)
+                log = f.read().decode(errors="replace")
+            if needle is None or needle in log:
+                return log
+            if time.monotonic() > deadline:
+                return log
+            time.sleep(0.05)
 
     def _https_get(self, path, expected_status=200):
         """Make an HTTPS GET request to the daemon."""
@@ -574,6 +647,19 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         status, body, headers = self._https_get(path)
         self.assertEqual(status, 200)
         self.assertEqual(body, self.TEST_CONTENT)
+
+    def test_peer_resolve_failure(self):
+        """A peer that cannot be resolved must not take the daemon down."""
+        offset = self._daemon_log_offset()
+        path = f"/unresolvable.bin?sha256={self.unresolvable_hash}"
+        status, _, _ = self._https_get(path, expected_status=404)
+        self.assertEqual(status, 404)
+
+        # freeing the failed resolver must not return on the task a second
+        # time: that is a critical, and passimd makes criticals fatal
+        log = self._daemon_log_since(offset, needle="CRITICAL")
+        self.assertNotIn("CRITICAL", log)
+        self.assertIsNone(self.daemon_proc.poll(), "daemon exited")
 
     def test_cli_download(self):
         with tempfile.TemporaryDirectory() as tmpdir:
