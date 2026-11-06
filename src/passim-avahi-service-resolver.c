@@ -117,7 +117,7 @@ passim_avahi_service_resolver_signal(GTask *task, const gchar *signal_name, GVar
 		guint16 port = 0;
 		g_autoptr(GSocketAddress) socket_addr = NULL;
 		g_variant_get(parameters,
-			      "(iissssisqaayu)",
+			      "(iissssi&sqaayu)",
 			      NULL,
 			      NULL,
 			      NULL,

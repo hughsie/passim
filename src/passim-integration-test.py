@@ -69,6 +69,33 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
 
         super().tearDownClass()
 
+    @classmethod
+    def _assert_no_daemon_leaks(cls):
+        """Fail if the daemon leaked memory allocated by passim itself.
+
+        LeakSanitizer writes its report when the daemon exits, so this is only
+        meaningful for a build configured with -Db_sanitize=address. Leaks
+        inside system libraries are not reported against us, so only stack
+        frames from passim sources count.
+        """
+        try:
+            with open(cls.daemon_log, "rb") as f:
+                log = f.read().decode(errors="replace")
+        except OSError:
+            return
+        idx = log.find("LeakSanitizer")
+        if idx == -1:
+            return
+        frames = [
+            line.strip()
+            for line in log[idx:].splitlines()
+            if "/src/passim-" in line or "/libpassim/passim-" in line
+        ]
+        if frames:
+            raise AssertionError(
+                "daemon leaked memory allocated by passim:\n" + "\n".join(frames)
+            )
+
     @staticmethod
     def _parse_config_h(path, key):
         with open(path, "r") as f:
@@ -404,6 +431,9 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         cls.daemon_log = os.path.join(cls.tmpdir, "passimd.log")
         cls.daemon_log_fd = open(cls.daemon_log, "wb")
         cls.addClassCleanup(cls.daemon_log_fd.close)
+        # a cleanup so that it still runs if tearDownClass() raises, and after
+        # the mock bus has stopped so that a leak never leaves it running
+        cls.addClassCleanup(cls._assert_no_daemon_leaks)
         cls.daemon_proc = subprocess.Popen(
             [daemon_path, "--insecure"],
             env=env,
