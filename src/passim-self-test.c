@@ -479,6 +479,18 @@ passim_item_ctime_func(void)
 }
 
 static void
+passim_item_age_future_func(void)
+{
+	g_autoptr(GDateTime) dt_now = g_date_time_new_now_utc();
+	g_autoptr(GDateTime) dt_future = g_date_time_add_days(dt_now, 7);
+	g_autoptr(PassimItem) item = passim_item_new();
+
+	/* a file created in the future is not impossibly old */
+	passim_item_set_ctime(item, dt_future);
+	g_assert_cmpuint(passim_item_get_age(item), ==, 0);
+}
+
+static void
 passim_item_variant_func(void)
 {
 	g_autoptr(PassimItem) item = passim_item_new();
@@ -782,6 +794,7 @@ main(int argc, char **argv)
 	g_test_add_func("/passim/item/bytes", passim_item_bytes_func);
 	g_test_add_func("/passim/item/file", passim_item_file_func);
 	g_test_add_func("/passim/item/ctime", passim_item_ctime_func);
+	g_test_add_func("/passim/item/age-future", passim_item_age_future_func);
 	g_test_add_func("/passim/item/variant", passim_item_variant_func);
 	g_test_add_func("/passim/item/variant-empty", passim_item_variant_empty_func);
 	g_test_add_func("/passim/item/to-string", passim_item_to_string_func);
