@@ -100,6 +100,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             f.write(line)
 
     UNRESOLVABLE_PEER = "Passim-Unresolvable"
+    START_FAILS_PEER = "Passim-Start-Fails"
 
     SYSCONFPKG_CONTENT = b"sysconfpkgdir test file content"
     SYSCONFPKG_BASENAME = "sysconfpkg-test.bin"
@@ -235,6 +236,18 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceBrowser", "ItemNew", "iisssu",'
             " [dbus.Int32(-1), dbus.Int32(0),"
+            f' dbus.String("{cls.UNRESOLVABLE_PEER}"),'
+            ' dbus.String("_cache._tcp"),'
+            ' dbus.String("local"), dbus.UInt32(0)])\n'
+            "self.EmitSignal("
+            '"org.freedesktop.Avahi.ServiceBrowser", "ItemNew", "iisssu",'
+            " [dbus.Int32(-1), dbus.Int32(0),"
+            f' dbus.String("{cls.START_FAILS_PEER}"),'
+            ' dbus.String("_cache._tcp"),'
+            ' dbus.String("local"), dbus.UInt32(0)])\n'
+            "self.EmitSignal("
+            '"org.freedesktop.Avahi.ServiceBrowser", "ItemNew", "iisssu",'
+            " [dbus.Int32(-1), dbus.Int32(0),"
             ' dbus.String("Passim-Peer"),'
             ' dbus.String("_cache._tcp"),'
             ' dbus.String("local"), dbus.UInt32(0)])\n'
@@ -284,6 +297,8 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "o",
             f'if args[2] == "{cls.UNRESOLVABLE_PEER}":\n'
             '    ret = "/org/freedesktop/Avahi/ServiceResolver/2"\n'
+            f'elif args[2] == "{cls.START_FAILS_PEER}":\n'
+            '    ret = "/org/freedesktop/Avahi/ServiceResolver/3"\n'
             "else:\n"
             '    ret = "/org/freedesktop/Avahi/ServiceResolver/1"',
         )
@@ -322,11 +337,7 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             "/org/freedesktop/Avahi/ServiceResolver/1",
         )
         sr_mock = dbus.Interface(sr_obj, dbusmock.MOCK_IFACE)
-        sr_mock.AddMethod(
-            "org.freedesktop.Avahi.ServiceResolver",
-            "Start",
-            "",
-            "",
+        emit_found = (
             "import dbus\n"
             "self.EmitSignal("
             '"org.freedesktop.Avahi.ServiceResolver", "Found",'
@@ -339,9 +350,33 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             ' dbus.String("127.0.0.1"),'
             f" dbus.UInt16({cls.DAEMON_PORT}),"
             ' dbus.Array([], signature="ay"),'
-            " dbus.UInt32(0)])",
+            " dbus.UInt32(0)])"
+        )
+        sr_mock.AddMethod(
+            "org.freedesktop.Avahi.ServiceResolver", "Start", "", "", emit_found
         )
         sr_mock.AddMethod("org.freedesktop.Avahi.ServiceResolver", "Free", "", "", "")
+
+        # the signal is delivered, and only then does Start() itself fail
+        avahi_mock.AddObject(
+            "/org/freedesktop/Avahi/ServiceResolver/3",
+            "org.freedesktop.Avahi.ServiceResolver",
+            {},
+            [],
+        )
+        sr3_obj = bus.get_object(
+            "org.freedesktop.Avahi",
+            "/org/freedesktop/Avahi/ServiceResolver/3",
+        )
+        sr3_mock = dbus.Interface(sr3_obj, dbusmock.MOCK_IFACE)
+        sr3_mock.AddMethod(
+            "org.freedesktop.Avahi.ServiceResolver",
+            "Start",
+            "",
+            "",
+            emit_found + '\nraise dbus.exceptions.DBusException("Start failed")',
+        )
+        sr3_mock.AddMethod("org.freedesktop.Avahi.ServiceResolver", "Free", "", "", "")
 
     @classmethod
     def _start_daemon(cls, builddir):
@@ -647,6 +682,33 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         status, body, headers = self._https_get(path)
         self.assertEqual(status, 200)
         self.assertEqual(body, self.TEST_CONTENT)
+
+    def test_peer_resolve_failure_fallback(self):
+        """One peer failing to resolve must not abandon the other peers."""
+        offset = self._daemon_log_offset()
+        path = f"/{self.TEST_BASENAME}?sha256={self.test_hash}&localhost=false"
+        status, body, _ = self._https_get(path)
+        self.assertEqual(status, 200)
+        self.assertEqual(body, self.TEST_CONTENT)
+
+        log = self._daemon_log_since(offset, needle="chosen address")
+        self.assertIn(self.UNRESOLVABLE_PEER, log)
+        self.assertIn("failed to resolve service, ignoring:", log)
+        self.assertIn("chosen address", log)
+
+    def test_peer_start_failure(self):
+        """Start() failing after the peer resolved must not return twice."""
+        offset = self._daemon_log_offset()
+        path = f"/{self.TEST_BASENAME}?sha256={self.test_hash}&localhost=false"
+        status, body, _ = self._https_get(path)
+        self.assertEqual(status, 200)
+        self.assertEqual(body, self.TEST_CONTENT)
+
+        log = self._daemon_log_since(offset, needle="failed to start resolver")
+        self.assertIn(self.START_FAILS_PEER, log)
+        self.assertIn("failed to start resolver", log)
+        self.assertNotIn("CRITICAL", log)
+        self.assertIsNone(self.daemon_proc.poll(), "daemon exited")
 
     def test_peer_resolve_failure(self):
         """A peer that cannot be resolved must not take the daemon down."""
