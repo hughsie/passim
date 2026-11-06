@@ -673,6 +673,60 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Unpublished", result.stdout.decode())
 
+    def test_cli_publish_share_limit(self):
+        """The optional third argument is the share limit, not the count."""
+        content = b"passim cli publish share-limit test data"
+        content_hash = hashlib.sha256(content).hexdigest()
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            result = self._run_cli(["publish", tmp_path, "3600", "44"])
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+
+            bus = self.get_dbus(system_bus=True)
+            proxy = bus.get_object("org.freedesktop.Passim", "/")
+            iface = dbus.Interface(proxy, "org.freedesktop.Passim")
+            published = None
+            for item_dict in iface.GetItems():
+                if str(item_dict.get("hash", "")) == content_hash:
+                    published = item_dict
+                    break
+            self.assertIsNotNone(published, "published item not found")
+            self.assertEqual(int(published["max-age"]), 3600)
+            self.assertEqual(int(published["share-limit"]), 44)
+            self.assertEqual(int(published.get("share-count", 0)), 0)
+        finally:
+            os.unlink(tmp_path)
+            self._run_cli(["unpublish", content_hash])
+
+    def test_cli_publish_invalid_number(self):
+        """A malformed or out of range number must not be published."""
+        content = b"passim cli publish invalid number test data"
+        with tempfile.NamedTemporaryFile(suffix=".bin") as tmp:
+            tmp.write(content)
+            tmp.flush()
+            for args in (
+                ["abc"],
+                ["0"],
+                ["0", "0"],
+                ["4294967296"],
+                ["3600", "0"],
+                ["3600", "44x"],
+                ["3600", "-1"],
+                ["3600", "4294967296"],
+            ):
+                with self.subTest(args=args):
+                    result = self._run_cli(["publish", tmp.name] + args)
+                    self.assertGreater(result.returncode, 0, "killed by a signal")
+                    self.assertNotIn("Published", result.stdout.decode())
+
+        bus = self.get_dbus(system_bus=True)
+        proxy = bus.get_object("org.freedesktop.Passim", "/")
+        iface = dbus.Interface(proxy, "org.freedesktop.Passim")
+        hashes = [str(item_dict.get("hash", "")) for item_dict in iface.GetItems()]
+        self.assertNotIn(hashlib.sha256(content).hexdigest(), hashes)
+
     def test_cli_unpublish_bad_hash(self):
         result = self._run_cli(["unpublish", "d" * 64])
         self.assertNotEqual(result.returncode, 0)

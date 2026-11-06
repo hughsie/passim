@@ -360,10 +360,20 @@ passim_cli_publish(PassimCli *self, gchar **values, GError **error)
 	}
 	if (!passim_item_load_filename(item, values[0], error))
 		return FALSE;
-	if (g_strv_length(values) > 1)
-		passim_item_set_max_age(item, g_ascii_strtoull(values[1], NULL, 10));
-	if (g_strv_length(values) > 2)
-		passim_item_set_share_count(item, g_ascii_strtoull(values[2], NULL, 10));
+
+	/* zero is not sent to the daemon, which would silently use the default instead */
+	if (g_strv_length(values) > 1) {
+		guint64 max_age = 0;
+		if (!g_ascii_string_to_unsigned(values[1], 10, 1, G_MAXUINT32, &max_age, error))
+			return FALSE;
+		passim_item_set_max_age(item, max_age);
+	}
+	if (g_strv_length(values) > 2) {
+		guint64 share_limit = 0;
+		if (!g_ascii_string_to_unsigned(values[2], 10, 1, G_MAXUINT32, &share_limit, error))
+			return FALSE;
+		passim_item_set_share_limit(item, share_limit);
+	}
 	if (self->next_reboot)
 		passim_item_add_flag(item, PASSIM_ITEM_FLAG_NEXT_REBOOT);
 	if (!passim_client_publish(self->client, item, error))
