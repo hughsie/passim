@@ -87,7 +87,18 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
         with open(cls.test_file, "wb") as f:
             f.write(cls.TEST_CONTENT)
 
+        cls.doomed_hash = hashlib.sha256(cls.DOOMED_CONTENT).hexdigest()
+        cls.doomed_file = os.path.join(
+            cls.data_path, f"{cls.doomed_hash}-{cls.DOOMED_BASENAME}"
+        )
+        with open(cls.doomed_file, "wb") as f:
+            f.write(cls.DOOMED_CONTENT)
+
         os.makedirs(os.path.join(cls.tmpdir, "log", "passim"), exist_ok=True)
+
+    # indexed at startup, then deleted so that sending it always fails
+    DOOMED_CONTENT = b"this file disappears before it is ever shared"
+    DOOMED_BASENAME = "doomed.bin"
 
     SEEDED_DOWNLOAD_SIZE = 42000
 
@@ -431,6 +442,11 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
                 return log
             time.sleep(0.05)
 
+    def _audit_log(self):
+        path = os.path.join(self.tmpdir, "log", "passim", "audit.log")
+        with open(path, "r") as f:
+            return f.read()
+
     def _https_get(self, path, expected_status=200):
         """Make an HTTPS GET request to the daemon."""
         ctx = ssl.create_default_context()
@@ -503,6 +519,24 @@ class PassimIntegrationTest(dbusmock.DBusTestCase):
             f"/file?sha256={unknown}", expected_status=404
         )
         self.assertEqual(status, 404)
+
+    def test_share_failure_not_counted(self):
+        """A file that could not be sent must not count as having been shared."""
+        bus = self.get_dbus(system_bus=True)
+        proxy = bus.get_object("org.freedesktop.Passim", "/")
+        props = dbus.Interface(proxy, dbus.PROPERTIES_IFACE)
+        saving = int(props.Get("org.freedesktop.Passim", "DownloadSaving"))
+
+        if os.path.exists(self.doomed_file):
+            os.unlink(self.doomed_file)
+        path = f"/{self.DOOMED_BASENAME}?sha256={self.doomed_hash}"
+        status, _, _ = self._https_get(path, expected_status=500)
+        self.assertEqual(status, 500)
+
+        self.assertNotIn(self.doomed_hash, self._audit_log())
+        self.assertEqual(
+            saving, int(props.Get("org.freedesktop.Passim", "DownloadSaving"))
+        )
 
     def test_sysconfpkgdir_item(self):
         path = f"/{self.SYSCONFPKG_BASENAME}?sha256={self.sysconfpkg_hash}"

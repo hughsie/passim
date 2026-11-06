@@ -818,7 +818,7 @@ passim_server_send_index(PassimServer *self, SoupServerMessage *msg)
 	soup_server_message_set_response(msg, "text/html", SOUP_MEMORY_COPY, html->str, html->len);
 }
 
-static void
+static gboolean
 passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gchar *path)
 {
 	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(msg);
@@ -832,7 +832,7 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 	if (mapping == NULL) {
 		g_debug("failed to map file: %s", error->message);
 		soup_server_message_set_status(msg, SOUP_STATUS_INTERNAL_SERVER_ERROR, NULL);
-		return;
+		return FALSE;
 	}
 	bytes = g_bytes_new_with_free_func(g_mapped_file_get_contents(mapping),
 					   g_mapped_file_get_length(mapping),
@@ -849,8 +849,9 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 				 &error);
 	if (info == NULL) {
 		g_debug("failed to query file info: %s", error->message);
+		soup_message_body_truncate(soup_server_message_get_response_body(msg));
 		soup_server_message_set_status(msg, SOUP_STATUS_INTERNAL_SERVER_ERROR, NULL);
-		return;
+		return FALSE;
 	}
 	if (g_file_info_get_content_type(info) != NULL) {
 		g_autofree gchar *mime_type =
@@ -858,6 +859,9 @@ passim_server_msg_send_file(PassimServer *self, SoupServerMessage *msg, const gc
 		if (mime_type != NULL)
 			soup_message_headers_append(hdrs, "Content-Type", mime_type);
 	}
+
+	/* success */
+	return TRUE;
 }
 
 static gboolean
@@ -887,7 +891,7 @@ passim_server_delete_item(PassimServer *self, PassimItem *item, GError **error)
 	return TRUE;
 }
 
-static void
+static gboolean
 passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimItem *item)
 {
 	SoupMessageHeaders *hdrs = soup_server_message_get_response_headers(msg);
@@ -899,8 +903,13 @@ passim_server_msg_send_item(PassimServer *self, SoupServerMessage *msg, PassimIt
 	content_disposition = g_strdup_printf("attachment; filename=\"%s\"", filename);
 	soup_message_headers_append(hdrs, "Content-Disposition", content_disposition);
 
-	passim_server_msg_send_file(self, msg, path);
+	/* nothing was sent, so this does not count as a share */
+	if (!passim_server_msg_send_file(self, msg, path))
+		return FALSE;
+
+	/* success */
 	passim_item_set_share_count(item, passim_item_get_share_count(item) + 1);
+	return TRUE;
 }
 
 static void
@@ -1052,7 +1061,7 @@ passim_server_handler_cb(SoupServer *server,
 			passim_server_msg_send_error(self, msg, SOUP_STATUS_FORBIDDEN, NULL);
 			return;
 		}
-		passim_server_msg_send_file(self, msg, fn);
+		(void)passim_server_msg_send_file(self, msg, fn);
 		return;
 	}
 
@@ -1129,7 +1138,8 @@ passim_server_handler_cb(SoupServer *server,
 			passim_server_msg_send_error(self, msg, SOUP_STATUS_LOCKED, NULL);
 			return;
 		}
-		passim_server_msg_send_item(self, msg, item);
+		if (!passim_server_msg_send_item(self, msg, item))
+			return;
 
 		/* update counter */
 		self->download_saving += passim_item_get_size(item);
