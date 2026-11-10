@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: passim\n"
-"Report-Msgid-Bugs-To: richard@hughsie.com\n"
-"POT-Creation-Date: 2026-07-28 12:11+0100\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-06 17:31+0000\n"
 "PO-Revision-Date: 2026-07-29 21:01+0000\n"
 "Last-Translator: Knut Ingvald Dietzel <weblate.kid@dietzel.no>\n"
 "Language-Team: Norwegian Bokmål <https://hosted.weblate.org/projects/passim/"
@@ -99,115 +99,115 @@ msgid "URI"
 msgstr "URI"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:358 src/passim-cli.c:388
+#: src/passim-cli.c:358 src/passim-cli.c:398
 msgid "Invalid arguments"
 msgstr "Ugyldige argumenter"
 
 #. TRANSLATORS: now sharing to the world
-#: src/passim-cli.c:375
+#: src/passim-cli.c:385
 msgid "Published"
 msgstr "Publisert"
 
 #. TRANSLATORS: no longer sharing with the world
-#: src/passim-cli.c:395
+#: src/passim-cli.c:405
 msgid "Unpublished"
 msgstr "Upublisert"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:433
+#: src/passim-cli.c:443
 msgid "Invalid arguments, expected BASENAME HASH"
 msgstr "Ugyldige argumenter, forventet BASENAME HASH"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address and %3 is
 #. the untranslated error phrase
-#: src/passim-cli.c:476
+#: src/passim-cli.c:486
 #, c-format
 msgid "Failed to download %s from %s: %s"
 msgstr "Mislyktes i å laste ned %s fra %s: %s"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address
-#: src/passim-cli.c:490
+#: src/passim-cli.c:500
 #, c-format
 msgid "Failed to download %s from %s as file checksum does not match"
 msgstr "Mislyktes i å laste ned %s fra %s siden filens sjekksum ikke samsvarer"
 
 #. TRANSLATORS: %1 is a filename, %2 is size (e.g. '1.3 MB') and %3 is a type, (e.g.
 #. * 'application/zstd')
-#: src/passim-cli.c:509
+#: src/passim-cli.c:519
 #, c-format
 msgid "Saved %s (%s of %s)"
 msgstr "Lagret %s (%s av %s)"
 
 #. TRANSLATORS: --version
-#: src/passim-cli.c:525
+#: src/passim-cli.c:535
 msgid "Show project version"
 msgstr "Vis prosjektversjon"
 
-#: src/passim-cli.c:532
+#: src/passim-cli.c:542
 msgid "Next reboot"
 msgstr "Neste omstart"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:547
+#: src/passim-cli.c:557
 msgid "Show daemon status"
 msgstr "Vis tjenestens status"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:552
+#: src/passim-cli.c:562
 msgid "FILENAME [MAX-AGE] [MAX-SHARE]"
 msgstr "FILNAVN [MAKS-ALDER] [MAX-DELING]"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:554
+#: src/passim-cli.c:564
 msgid "Publish an additional file"
 msgstr "Publiser en fil i tillegg"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:559
+#: src/passim-cli.c:569
 msgid "HASH"
 msgstr "HASH"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:561
+#: src/passim-cli.c:571
 msgid "Unpublish an existing file"
 msgstr "Av-publiser en eksisterende fil"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:566
+#: src/passim-cli.c:576
 msgid "BASENAME HASH"
 msgstr "BASENAME HASH"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:568
+#: src/passim-cli.c:578
 msgid "Download a file from a remote machine"
 msgstr "Last ned en fil fra en ekstern maskin"
 
 #. TRANSLATORS: CLI tool description
-#: src/passim-cli.c:575
+#: src/passim-cli.c:585
 msgid "Interact with the local passimd process."
 msgstr "Samhandle med den lokale passimd-prosessen."
 
 #. TRANSLATORS: CLI tool name
-#: src/passim-cli.c:577
+#: src/passim-cli.c:587
 msgid "Passim CLI"
 msgstr "Passim-CLI"
 
 #. TRANSLATORS: we don't know what to do
-#: src/passim-cli.c:581
+#: src/passim-cli.c:591
 msgid "Failed to parse arguments"
 msgstr "Kunne ikke tolke argumentene"
 
 #. TRANSLATORS: daemon failed to start
-#: src/passim-cli.c:589
+#: src/passim-cli.c:606
 msgid "Failed to connect to daemon"
 msgstr "Fikk ikke kontakt med tjenesten"
 
 #. TRANSLATORS: CLI tool
-#: src/passim-cli.c:596
+#: src/passim-cli.c:613
 msgid "client version"
 msgstr "klientversjon"
 
 #. TRANSLATORS: server
-#: src/passim-cli.c:598
+#: src/passim-cli.c:615
 msgid "daemon version"
 msgstr "tjenesteversjon"

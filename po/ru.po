@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: passim\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-28 12:11+0100\n"
+"POT-Creation-Date: 2026-11-06 17:31+0000\n"
 "PO-Revision-Date: 2024-06-28 16:09+0000\n"
 "Last-Translator: Airat Makhmutov <rautyrauty@gmail.com>\n"
 "Language-Team: Russian <https://hosted.weblate.org/projects/passim/passim/ru/"
@@ -101,34 +101,34 @@ msgid "URI"
 msgstr "URI"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:358 src/passim-cli.c:388
+#: src/passim-cli.c:358 src/passim-cli.c:398
 msgid "Invalid arguments"
 msgstr "Недопустимые аргументы"
 
 #. TRANSLATORS: now sharing to the world
-#: src/passim-cli.c:375
+#: src/passim-cli.c:385
 msgid "Published"
 msgstr "Опубликовано"
 
 #. TRANSLATORS: no longer sharing with the world
-#: src/passim-cli.c:395
+#: src/passim-cli.c:405
 msgid "Unpublished"
 msgstr "Не опубликовано"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:433
+#: src/passim-cli.c:443
 msgid "Invalid arguments, expected BASENAME HASH"
 msgstr "Недопустимые аргументы, ожидалось BASENAME HASH"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address and %3 is
 #. the untranslated error phrase
-#: src/passim-cli.c:476
+#: src/passim-cli.c:486
 #, c-format
 msgid "Failed to download %s from %s: %s"
 msgstr "Не удалось скачать %s из %s:%s"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address
-#: src/passim-cli.c:490
+#: src/passim-cli.c:500
 #, c-format
 msgid "Failed to download %s from %s as file checksum does not match"
 msgstr ""
@@ -136,81 +136,81 @@ msgstr ""
 
 #. TRANSLATORS: %1 is a filename, %2 is size (e.g. '1.3 MB') and %3 is a type, (e.g.
 #. * 'application/zstd')
-#: src/passim-cli.c:509
+#: src/passim-cli.c:519
 #, c-format
 msgid "Saved %s (%s of %s)"
 msgstr "Сохранено %s (%s %s)"
 
 #. TRANSLATORS: --version
-#: src/passim-cli.c:525
+#: src/passim-cli.c:535
 msgid "Show project version"
 msgstr "Показать версию проекта"
 
-#: src/passim-cli.c:532
+#: src/passim-cli.c:542
 msgid "Next reboot"
 msgstr "Следующая перезагрузка"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:547
+#: src/passim-cli.c:557
 msgid "Show daemon status"
 msgstr "Показать статус демона"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:552
+#: src/passim-cli.c:562
 msgid "FILENAME [MAX-AGE] [MAX-SHARE]"
 msgstr "ИМЯ-ФАЙЛА [МАКСИМАЛЬНЫЙ-ВОЗРАСТ] [МАКСИМАЛЬНАЯ-РАЗДАЧА]"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:554
+#: src/passim-cli.c:564
 msgid "Publish an additional file"
 msgstr "Опубликовать дополнительный файл"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:559
+#: src/passim-cli.c:569
 msgid "HASH"
 msgstr "HASH"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:561
+#: src/passim-cli.c:571
 msgid "Unpublish an existing file"
 msgstr "Отменить публикацию существующего файла"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:566
+#: src/passim-cli.c:576
 msgid "BASENAME HASH"
 msgstr "BASENAME HASH"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:568
+#: src/passim-cli.c:578
 msgid "Download a file from a remote machine"
 msgstr "Загрузите файл с удаленной машины"
 
 #. TRANSLATORS: CLI tool description
-#: src/passim-cli.c:575
+#: src/passim-cli.c:585
 msgid "Interact with the local passimd process."
 msgstr "Взаимодействие с локальным процессом passimd."
 
 #. TRANSLATORS: CLI tool name
-#: src/passim-cli.c:577
+#: src/passim-cli.c:587
 msgid "Passim CLI"
 msgstr "Passim CLI"
 
 #. TRANSLATORS: we don't know what to do
-#: src/passim-cli.c:581
+#: src/passim-cli.c:591
 msgid "Failed to parse arguments"
 msgstr "Не удалось проанализировать аргументы"
 
 #. TRANSLATORS: daemon failed to start
-#: src/passim-cli.c:589
+#: src/passim-cli.c:606
 msgid "Failed to connect to daemon"
 msgstr "Не удалось подключиться к демону"
 
 #. TRANSLATORS: CLI tool
-#: src/passim-cli.c:596
+#: src/passim-cli.c:613
 msgid "client version"
 msgstr "версия клиента"
 
 #. TRANSLATORS: server
-#: src/passim-cli.c:598
+#: src/passim-cli.c:615
 msgid "daemon version"
 msgstr "версия демона"
