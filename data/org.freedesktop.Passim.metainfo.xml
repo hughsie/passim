@@ -20,6 +20,24 @@
     <binary>passim</binary>
   </provides>
   <releases>
+    <release version="0.1.13" date="2026-11-10">
+      <description>
+        <p>
+          This release adds the following features:
+        </p>
+        <ul>
+          <li>Show the help when no CLI command is given</li>
+        </ul>
+        <p>This release fixes the following bugs:</p>
+        <ul>
+          <li>Continue searching when one Avahi service fails to resolve</li>
+          <li>Do not count a failed transfer as a share</li>
+          <li>Do not report a file created in the future as ancient</li>
+          <li>Fix a tiny memory leak when resolving a peer address</li>
+          <li>Set the share limit, not the share count, from the CLI</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.12" date="2026-07-28">
       <description>
         <p>
