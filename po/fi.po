@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: passim\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-28 12:11+0100\n"
+"POT-Creation-Date: 2026-11-06 17:31+0000\n"
 "PO-Revision-Date: 2025-03-02 11:02+0000\n"
 "Last-Translator: Ricky Tigg <ricky.tigg@gmail.com>\n"
 "Language-Team: Finnish <https://hosted.weblate.org/projects/passim/passim/fi/"
@@ -100,34 +100,34 @@ msgid "URI"
 msgstr "URI"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:358 src/passim-cli.c:388
+#: src/passim-cli.c:358 src/passim-cli.c:398
 msgid "Invalid arguments"
 msgstr "Epäkelvolliset argumentit"
 
 #. TRANSLATORS: now sharing to the world
-#: src/passim-cli.c:375
+#: src/passim-cli.c:385
 msgid "Published"
 msgstr "Julkaistu"
 
 #. TRANSLATORS: no longer sharing with the world
-#: src/passim-cli.c:395
+#: src/passim-cli.c:405
 msgid "Unpublished"
 msgstr "Julkaisematon"
 
 #. TRANSLATORS: user mistyped the command
-#: src/passim-cli.c:433
+#: src/passim-cli.c:443
 msgid "Invalid arguments, expected BASENAME HASH"
 msgstr "Epäkelvolliset argumentit; odotettu ALUSTANIMI HAJAUTUS"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address and %3 is
 #. the untranslated error phrase
-#: src/passim-cli.c:476
+#: src/passim-cli.c:486
 #, c-format
 msgid "Failed to download %s from %s: %s"
 msgstr "%s:n lataaminen %s:sta epäonnistui: %s"
 
 #. TRANSLATORS: %1 is a filename, %2 is a internet address
-#: src/passim-cli.c:490
+#: src/passim-cli.c:500
 #, c-format
 msgid "Failed to download %s from %s as file checksum does not match"
 msgstr ""
@@ -135,81 +135,81 @@ msgstr ""
 
 #. TRANSLATORS: %1 is a filename, %2 is size (e.g. '1.3 MB') and %3 is a type, (e.g.
 #. * 'application/zstd')
-#: src/passim-cli.c:509
+#: src/passim-cli.c:519
 #, c-format
 msgid "Saved %s (%s of %s)"
 msgstr "Säästetty %s (%s/%s)"
 
 #. TRANSLATORS: --version
-#: src/passim-cli.c:525
+#: src/passim-cli.c:535
 msgid "Show project version"
 msgstr "Näytä projektin versio"
 
-#: src/passim-cli.c:532
+#: src/passim-cli.c:542
 msgid "Next reboot"
 msgstr "Seuraava uudelleenkäynnistys"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:547
+#: src/passim-cli.c:557
 msgid "Show daemon status"
 msgstr "Näytä demonin tila"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:552
+#: src/passim-cli.c:562
 msgid "FILENAME [MAX-AGE] [MAX-SHARE]"
 msgstr "TIEDOSTON_NIMI [MAKS-IKÄ] [MAKS-JAKO]"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:554
+#: src/passim-cli.c:564
 msgid "Publish an additional file"
 msgstr "Julkaise lisätiedosto"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:559
+#: src/passim-cli.c:569
 msgid "HASH"
 msgstr "HAJAUTUS"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:561
+#: src/passim-cli.c:571
 msgid "Unpublish an existing file"
 msgstr "Peruuta olemassa olevan tiedoston julkaisu"
 
 #. TRANSLATORS: CLI option example
-#: src/passim-cli.c:566
+#: src/passim-cli.c:576
 msgid "BASENAME HASH"
 msgstr "ALUSTANIMI HAJAUTUS"
 
 #. TRANSLATORS: CLI action description
-#: src/passim-cli.c:568
+#: src/passim-cli.c:578
 msgid "Download a file from a remote machine"
 msgstr "Lataa tiedosto etäkoneelta"
 
 #. TRANSLATORS: CLI tool description
-#: src/passim-cli.c:575
+#: src/passim-cli.c:585
 msgid "Interact with the local passimd process."
 msgstr "Ole vuorovaikutuksessa paikallisen passimd-prosessin kanssa."
 
 #. TRANSLATORS: CLI tool name
-#: src/passim-cli.c:577
+#: src/passim-cli.c:587
 msgid "Passim CLI"
 msgstr "Passim-CLI"
 
 #. TRANSLATORS: we don't know what to do
-#: src/passim-cli.c:581
+#: src/passim-cli.c:591
 msgid "Failed to parse arguments"
 msgstr "Argumenttien jäsentäminen epäonnistui"
 
 #. TRANSLATORS: daemon failed to start
-#: src/passim-cli.c:589
+#: src/passim-cli.c:606
 msgid "Failed to connect to daemon"
 msgstr "Yhteyden muodostaminen demoniin epäonnistui"
 
 #. TRANSLATORS: CLI tool
-#: src/passim-cli.c:596
+#: src/passim-cli.c:613
 msgid "client version"
 msgstr "asiakasversio"
 
 #. TRANSLATORS: server
-#: src/passim-cli.c:598
+#: src/passim-cli.c:615
 msgid "daemon version"
 msgstr "demoniversio"
